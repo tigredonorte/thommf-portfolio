@@ -8,6 +8,24 @@
     },
     {
       "path": "./apps/thommf-portfolio"
+    },
+    {
+      "path": "./container-e2e"
+    },
+    {
+      "path": "./container"
+    },
+    {
+      "path": "./apps/headerMfe-e2e"
+    },
+    {
+      "path": "./apps/headerMfe"
+    },
+    {
+      "path": "./apps/projectListMfe-e2e"
+    },
+    {
+      "path": "./apps/projectListMfe"
     }
   ]
 }

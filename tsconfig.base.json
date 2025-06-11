@@ -16,6 +16,11 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["development"]
+    "customConditions": ["development"],
+    "baseUrl": ".",
+    "paths": {
+      "headerMfe/Module": ["apps/headerMfe/src/remote-entry.ts"],
+      "projectListMfe/Module": ["apps/projectListMfe/src/remote-entry.ts"]
+    }
   }
 }
