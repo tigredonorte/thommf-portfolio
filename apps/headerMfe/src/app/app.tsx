@@ -1,12 +1,18 @@
-// Uncomment this line to use CSS modules
-// import styles from './app.module.scss';
-import NxWelcome from './nx-welcome';
+import './app.scss';
 
 export function App() {
   return (
-    <div>
-      <NxWelcome title="headerMfe" />
-    </div>
+    <header className="header">
+      <div className="brand">
+        <h1>Your Name</h1>
+        <p>Software Developer</p>
+      </div>
+      <nav>
+        <a href="/">Projects</a>
+        <a href="/">About Me</a>
+        <a href="/">Contact</a>
+      </nav>
+    </header>
   );
 }
 

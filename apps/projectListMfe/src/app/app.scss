@@ -1,0 +1,73 @@
+.wrapper {
+  padding: 2rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.main-title {
+  font-size: 2.5rem;
+  color: #2a3d45;
+  border-bottom: 3px solid #eee;
+  padding-bottom: 1rem;
+  margin-bottom: 2rem;
+}
+
+.company-section {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 2.5rem;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+  overflow: hidden; // To contain the header background
+}
+
+.company-header {
+  background: #f7f9fa;
+  padding: 1.5rem;
+  border-bottom: 1px solid #ddd;
+
+  h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.75rem;
+    color: #2a3d45;
+  }
+
+  h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #555;
+  }
+
+  a {
+    color: #007bff;
+    text-decoration: none;
+    font-size: 0.9rem;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.project-list {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: #333;
+    border-bottom: 1px solid #eee;
+    transition: background-color 0.2s;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background-color: #fdfdfd;
+    }
+  }
+}

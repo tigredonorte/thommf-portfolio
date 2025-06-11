@@ -1,30 +1,21 @@
 import * as React from 'react';
-import NxWelcome from './nx-welcome';
-import { Link, Route, Routes } from 'react-router-dom';
+import './app.scss';
 
-const ProjectListMfe = React.lazy(() => import('project-list-mfe/Module'));
-
-const HeaderMfe = React.lazy(() => import('header-mfe/Module'));
+const Header = React.lazy(() => import('headerMfe/Module'));
+const ProjectList = React.lazy(() => import('projectListMfe/Module'));
 
 export function App() {
   return (
-    <React.Suspense fallback={null}>
-      <ul>
-        <li>
-          <Link to="/">Home</Link>
-        </li>
-        <li>
-          <Link to="/project-list-mfe">ProjectListMfe</Link>
-        </li>
-        <li>
-          <Link to="/header-mfe">HeaderMfe</Link>
-        </li>
-      </ul>
-      <Routes>
-        <Route path="/" element={<NxWelcome title="container" />} />
-        <Route path="/project-list-mfe" element={<ProjectListMfe />} />
-        <Route path="/header-mfe" element={<HeaderMfe />} />
-      </Routes>
+    <React.Suspense fallback={<div className="loader">Loading...</div>}>
+      <div className="app-layout">
+        <Header />
+        <main className="main-content">
+          <ProjectList />
+        </main>
+        <footer className="footer">
+          <p>© 2025 Your Name. Built with Microfrontends.</p>
+        </footer>
+      </div>
     </React.Suspense>
   );
 }

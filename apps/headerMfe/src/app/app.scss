@@ -1,0 +1,33 @@
+.header {
+  background-color: #2a3d45;
+  color: white;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+  .brand {
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+    p {
+      margin: 0;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+  }
+
+  .header nav a {
+    color: white;
+    margin-left: 1.5rem;
+    text-decoration: none;
+    font-size: 1rem;
+    transition: opacity 0.2s;
+    &:hover {
+      opacity: 0.8;
+    }
+  }
+}
+
