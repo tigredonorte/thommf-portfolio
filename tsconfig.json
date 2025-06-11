@@ -20,6 +20,9 @@
     },
     {
       "path": "./apps/container"
+    },
+    {
+      "path": "./libs/shared/config"
     }
   ]
 }

@@ -1,82 +1,168 @@
-# ThommfPortfolio
+# ThomMF Portfolio
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+This project is a personal portfolio website designed to showcase my skills and projects. It is built using a micro-frontend architecture with Module Federation, allowing for a modular and scalable design.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
+## Table of Contents
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/next?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+- [ThomMF Portfolio](#thommf-portfolio)
+  - [Table of Contents](#table-of-contents)
+  - [Project Overview](#project-overview)
+  - [Architecture](#architecture)
+  - [Project Structure](#project-structure)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+  - [Development](#development)
+  - [Building the Project](#building-the-project)
+  - [Testing](#testing)
+    - [Unit Tests](#unit-tests)
+    - [End-to-End (E2E) Tests](#end-to-end-e2e-tests)
+  - [Linting and Formatting](#linting-and-formatting)
+  - [Deployment](#deployment)
+  - [Technologies Used](#technologies-used)
+  - [License](#license)
 
-## Finish your CI setup
+## Project Overview
 
-[Click here to finish setting up your workspace!](https://cloud.nx.app/connect/2JKxNZW5mp)
+This portfolio presents my work as a software developer. It includes:
+*   A dynamic header.
+*   A section listing various projects I've worked on.
 
+The main goal is to demonstrate proficiency in modern web development practices and technologies.
 
-## Run tasks
+## Architecture
 
-To run the dev server for your app, use:
+The portfolio is built using a micro-frontend architecture. This approach breaks down the application into smaller, independent, and deployable units. We are using **Module Federation** (via `@module-federation/enhanced` and Nx's built-in support) to achieve this.
 
-```sh
-npx nx dev thommf-portfolio
+Key benefits of this architecture for this project include:
+*   **Independent Development & Deployment:** Different parts of the portfolio (e.g., header, project list) can be developed, tested, and deployed independently.
+*   **Scalability:** Easier to add new sections or features as separate micro-frontends.
+*   **Technology Agnostic (Potentially):** While currently using React, micro-frontends could theoretically be built with different frameworks if needed.
+
+The `container` application acts as the shell, orchestrating and loading the different micro-frontends like `headerMfe` and `projectListMfe`.
+
+## Project Structure
+
+The workspace is organized as follows:
+
+- `apps/`: Contains the applications (micro-frontends and the main container).
+  - `container/`: The main application shell that orchestrates the micro-frontends.
+  - `headerMfe/`: Micro-frontend for the header section.
+  - `projectListMfe/`: Micro-frontend for displaying a list of projects.
+  - `*-e2e/`: End-to-end test projects for each application (e.g., `container-e2e`, `headerMfe-e2e`).
+- `libs/`: Contains shared libraries and components.
+  - `shared/`: A library for shared utilities, components, or types. (e.g., `libs/shared/config` for shared configurations).
+- `tmp/`: Temporary files, including static remotes for module federation during development (`tmp/static-remotes`).
+- Configuration files (e.g., `nx.json`, `package.json`, `tsconfig.base.json`, etc.) are at the root level.
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (version specified in `.nvmrc` if present, or compatible with the `packageManager` version in `package.json`)
+- pnpm (version specified in `packageManager` field in `package.json` - currently `pnpm@10.6.5`)
+
+### Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd thommf-portfolio
+    ```
+2.  **Install dependencies:**
+    ```bash
+    pnpm install
+    ```
+
+## Development
+
+To start the development server with all micro-frontends running:
+
+```bash
+pnpm dev
 ```
 
-To create a production bundle:
+This command (`nx serve container --open --dev-remotes=headerMfe,projectListMfe`) will serve the `container` application and automatically detect and serve the `headerMfe` and `projectListMfe` as development remotes. The application will typically be accessible at `http://localhost:4200`.
 
-```sh
-npx nx build thommf-portfolio
+## Building the Project
+
+To build all applications and libraries for production:
+
+```bash
+pnpm build
 ```
+This maps to `nx run-many --target=build --all`. The build artifacts will be located in the `dist/` directory for each project.
 
-To see all available targets to run for a project, run:
+## Testing
 
-```sh
-npx nx show project thommf-portfolio
+### Unit Tests
+
+To run unit tests for all projects:
+
+```bash
+pnpm test
 ```
+This maps to `nx run-many --target=test --all`. Tests are primarily written with Jest.
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+### End-to-End (E2E) Tests
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+To run E2E tests for all applications:
 
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-Use the plugin's generator to create new projects.
-
-To generate a new application, use:
-
-```sh
-npx nx g @nx/next:app demo
+```bash
+pnpm e2e
 ```
+This maps to `nx run-many --target=e2e --all`. E2E tests are written using Playwright.
 
-To generate a new library, use:
+## Linting and Formatting
 
-```sh
-npx nx g @nx/react:lib mylib
+To lint all projects:
+
+```bash
+pnpm lint
 ```
+This maps to `nx run-many --target=lint --all`.
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+To automatically format the code using Prettier:
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+pnpm format
+```
+This maps to `nx format:write`.
 
+To check for formatting issues:
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+```bash
+pnpm format:check
+```
+This maps to `nx format:check`.
 
-## Install Nx Console
+## Deployment
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+(Details about the deployment process will be added here once finalized. This section should cover how the container and micro-frontends are deployed and hosted.)
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Technologies Used
 
-## Useful links
+- **Framework/Libraries:**
+  - React 19
+  - React Router DOM 6.29.0
+- **Build & Monorepo Management:**
+  - Nx 21.1.3
+  - Webpack with Module Federation (`@module-federation/enhanced` ^0.9.0)
+  - Vite (used for `libs/shared/config`)
+- **Language:**
+  - TypeScript (~5.7.2)
+- **Testing:**
+  - Jest (^29.7.0) (Unit Tests)
+  - Playwright (^1.36.0) (E2E Tests)
+  - Testing Library (React) (16.1.0)
+- **Linting & Formatting:**
+  - ESLint (^9.8.0)
+  - Prettier (^2.6.2)
+- **Styling:**
+  - SCSS (Sass 1.62.1)
+- **Package Manager:**
+  - pnpm 10.6.5
 
-Learn more:
+## License
 
-- [Learn more about this workspace setup](https://nx.dev/nx-api/next?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+This project is licensed under the MIT License. (You may want to create a `LICENSE` file with the MIT license text).

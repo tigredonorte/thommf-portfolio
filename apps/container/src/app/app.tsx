@@ -1,3 +1,4 @@
+import { config } from '@thommf-portfolio/config';
 import * as React from 'react';
 import './app.scss';
 
@@ -13,7 +14,7 @@ export function App() {
           <ProjectList />
         </main>
         <footer className="footer">
-          <p>© 2025 Your Name. Built with Microfrontends.</p>
+          <p>© 2025 {config.developerName}. Built with Microfrontends.</p>
         </footer>
       </div>
     </React.Suspense>
