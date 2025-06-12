@@ -19,6 +19,7 @@
 }
 
 .company-header {
+  position: sticky;
   padding: 0 0.5rem 1rem 0.5rem;
   border-bottom: 1px solid #ddd;
   margin-bottom: 2rem;
@@ -80,6 +81,20 @@
     filter: blur(0);
     display: block;
   }
+}
+.carousel-slide-container {
+  cursor: pointer;
+}
+
+.industry-tag {
+  display: inline-block;
+  background-color: #f0f0f0;
+  color: #555;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
 }
 
 .project-details {

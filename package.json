@@ -20,7 +20,8 @@
     "react-dom": "19.0.0",
     "react-lazy-load-image-component": "^1.6.3",
     "react-responsive-carousel": "^3.2.23",
-    "react-router-dom": "6.29.0"
+    "react-router-dom": "6.29.0",
+    "yet-another-react-lightbox": "^3.23.2"
   },
   "devDependencies": {
     "@babel/core": "^7.14.5",
