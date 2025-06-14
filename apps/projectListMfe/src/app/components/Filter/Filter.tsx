@@ -11,53 +11,45 @@ interface FilterProps {
   searchTerm: string;
   onSearchChange: (term: string) => void;
   suggestions: Suggestion[];
+  children?: React.ReactNode;
 }
 
 export const Filter = ({
   searchTerm,
   onSearchChange,
   suggestions,
+  children,
 }: FilterProps) => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(0);
   const [suggestionRemainder, setSuggestionRemainder] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const firstSearchSuggestion = suggestions.find(s => s.type === 'search');
-    if (
-      searchTerm &&
-      firstSearchSuggestion &&
-      firstSearchSuggestion.text.toLowerCase().startsWith(searchTerm.toLowerCase()) &&
-      firstSearchSuggestion.text.toLowerCase() !== searchTerm.toLowerCase()
-    ) {
-      setSuggestionRemainder(firstSearchSuggestion.text.slice(searchTerm.length));
-    } else {
-      setSuggestionRemainder('');
-    }
-    
-    if (searchTerm && suggestions.length > 0) {
-      setShowSuggestions(true);
-      setActiveSuggestionIndex(0);
-    } else {
-      setShowSuggestions(false);
-    }
-  }, [searchTerm, suggestions]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    if (searchTerm && isInputFocused) {
+      const firstSearchSuggestion = suggestions.find(s => s.type === 'search');
       if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(event.target as Node)
+        firstSearchSuggestion &&
+        firstSearchSuggestion.text.toLowerCase().startsWith(searchTerm.toLowerCase()) &&
+        firstSearchSuggestion.text.toLowerCase() !== searchTerm.toLowerCase()
       ) {
+        setSuggestionRemainder(firstSearchSuggestion.text.slice(searchTerm.length));
+      } else {
+        setSuggestionRemainder('');
+      }
+      
+      if (suggestions.length > 0) {
+        setShowSuggestions(true);
+        setActiveSuggestionIndex(0);
+      } else {
         setShowSuggestions(false);
       }
+    } else {
+      setShowSuggestions(false);
+      setSuggestionRemainder('');
     }
-    document.addEventListener('click', handleClickOutside, true);
-    return () => {
-      document.removeEventListener('click', handleClickOutside, true);
-    };
-  }, [wrapperRef]);
+  }, [searchTerm, suggestions, isInputFocused]);
 
   const handleSuggestionClick = (suggestion: Suggestion) => {
     setShowSuggestions(false);
@@ -121,7 +113,7 @@ export const Filter = ({
 
   const handleInputBlur = () => {
     setTimeout(() => {
-        setShowSuggestions(false);
+      setIsInputFocused(false);
     }, 150);
   }
 
@@ -145,13 +137,13 @@ export const Filter = ({
           placeholder="Filter by technology, project, or keyword..."
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
-          onFocus={() => { if(searchTerm) setShowSuggestions(true); }}
+          onFocus={() => setIsInputFocused(true)}
           onBlur={handleInputBlur}
           onKeyDown={handleKeyDown}
           className="search-input"
           autoComplete="off"
         />
-        
+
         {showSuggestions && searchTerm && suggestions.length > 0 && (
           <ul className="autocomplete-suggestions">
             {suggestions.map((suggestion, index) => (
@@ -171,6 +163,7 @@ export const Filter = ({
           </ul>
         )}
       </div>
+      {children}
     </div>
   );
 };

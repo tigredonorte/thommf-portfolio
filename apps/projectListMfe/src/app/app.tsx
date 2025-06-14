@@ -1,30 +1,25 @@
-import { useState, useMemo } from 'react';
-import './app.scss';
 import { config } from '@thommf-portfolio/config';
+import { useMemo, useState } from 'react';
+import './app.scss';
 import { Experience } from './components/Experience';
-import { Filter, Suggestion } from './components/Filter';
+import { Filter, Suggestion, HighlightedFilters } from './components/Filter';
 import { ExperienceProvider } from './contexts/ExperienceContext';
 
-// --- Helper function to get all suggestions ---
 const getAllSuggestions = (): Suggestion[] => {
   const allSearchableTerms = new Set<string>();
   config.experience.forEach((exp) => {
     exp.projects.forEach((proj) => {
-      // Add all technologies to the set
       proj.tech.forEach((t) => allSearchableTerms.add(t));
-      // Add the industry to the set
       if (proj.industry) {
         allSearchableTerms.add(proj.industry);
       }
     });
   });
 
-  // Create search suggestions from the combined set
   const searchSuggestions: Suggestion[] = Array.from(allSearchableTerms)
     .sort((a, b) => a.localeCompare(b))
     .map(term => ({ text: term, type: 'search' }));
 
-  // Add static link suggestions
   const linkSuggestions: Suggestion[] = [
     { text: 'GitHub Profile', type: 'link', url: config.socials.github },
     { text: 'LinkedIn Profile', type: 'link', url: config.socials.linkedin },
@@ -33,15 +28,25 @@ const getAllSuggestions = (): Suggestion[] => {
   return [...searchSuggestions, ...linkSuggestions];
 };
 
+const highlightedTechnologies = [
+  'Angular',
+  'React',
+  'Node.js',
+  'MySQL',
+  'MongoDB',
+];
+
 export function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const allSuggestions = useMemo(() => getAllSuggestions(), []);
 
   const handleFilterChange = (term: string) => {
     setSearchTerm(term);
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
   };
 
-  // --- Improved suggestion algorithm with ranking ---
   const filteredSuggestions = useMemo(() => {
     if (!searchTerm) return [];
     const lowercasedFilter = searchTerm.toLowerCase();
@@ -65,21 +70,16 @@ export function App() {
     const lowercasedFilter = searchTerm.toLowerCase();
     if (!lowercasedFilter) return config.experience;
 
-    // Check if the search term is a known, specific technology or industry
     const isKnownTerm = allSuggestions.some(s => s.type === 'search' && s.text.toLowerCase() === lowercasedFilter);
 
     return config.experience
       .map((exp) => {
         const filteredProjects = exp.projects.filter((proj) => {
-          
-          // If it's a known term, be very specific
           if (isKnownTerm) {
             const techMatch = proj.tech?.some((t) => t.toLowerCase() === lowercasedFilter);
             const industryMatch = proj.industry?.toLowerCase() === lowercasedFilter;
             return techMatch || industryMatch;
           }
-
-          // Otherwise, perform the broad, inclusive search
           const textMatch =
             (proj.title && proj.title.toLowerCase().includes(lowercasedFilter)) ||
             (proj.description && proj.description.toLowerCase().includes(lowercasedFilter)) ||
@@ -102,7 +102,13 @@ export function App() {
         searchTerm={searchTerm}
         onSearchChange={handleFilterChange}
         suggestions={filteredSuggestions}
-      />
+      >
+        <HighlightedFilters
+          technologies={highlightedTechnologies}
+          onFilterSelect={handleFilterChange}
+          activeFilter={searchTerm}
+        />
+      </Filter>
 
       {filteredExperience.length > 0 ? (
         filteredExperience.map((experience) => (

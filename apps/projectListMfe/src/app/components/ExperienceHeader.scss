@@ -1,0 +1,30 @@
+.company-header {
+  background: #f7f9fa;
+  padding: 1.5rem;
+  border-bottom: 1px solid #ddd;
+  margin-bottom: 2rem;
+
+  // --- Sticky positioning ---
+  position: sticky;
+  top: 5rem;
+  z-index: 10;
+  // --- End sticky ---
+
+  h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.75rem;
+    color: #2a3d45;
+  }
+  h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: #555;
+  }
+  a {
+    color: #007bff;
+    text-decoration: none;
+    font-size: 0.9rem;
+    &:hover { text-decoration: underline; }
+  }
+}

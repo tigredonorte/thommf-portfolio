@@ -1,0 +1,41 @@
+.highlighted-filters-container {
+  text-align: center;
+  margin-top: 1rem
+}
+
+.filters-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.85rem;
+
+  button {
+    background-color: #e0f7fa;
+    color: #00796b;
+    border: 1px solid transparent; /* No visible border */
+    border-radius: 20px; /* More rounded "pill" shape */
+    padding: 0.6rem 1.25rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+
+    &:hover {
+      background-color: #9af3ff;
+      color: #002b26;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    &:active {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+    }
+
+    &.active {
+      background-color: #00796b;
+      color: white;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+  }
+}

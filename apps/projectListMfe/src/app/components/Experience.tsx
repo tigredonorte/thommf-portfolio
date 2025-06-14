@@ -1,24 +1,15 @@
-import { useExperience } from "../contexts/ExperienceContext";
-import { Project } from "./Project";
-import "./Experience.scss";
+import { useExperience } from '../contexts/ExperienceContext';
+import { ExperienceHeader } from './ExperienceHeader';
+import { ProjectList } from './ProjectList';
+import './Experience.scss';
 
 export const Experience = () => {
-  const experience = useExperience().experience;
+  const { experience } = useExperience();
 
   return (
-    <div className="company-section">
-      <header className="company-header">
-        <h3>{experience.company}</h3>
-        <h4>{experience.role}</h4>
-        {experience.url && (
-          <a href={experience.url} target="_blank" rel="noopener noreferrer">
-            {experience.url}
-          </a>
-        )}
-      </header>
-      <div className="projects-container">
-        {experience.projects.map((project) => <Project project={project} key={project.title} />)}
-      </div>
-    </div>
+    <section className="company-section">
+      <ExperienceHeader experience={experience} />
+      <ProjectList projects={experience.projects} />
+    </section>
   );
-}
+};

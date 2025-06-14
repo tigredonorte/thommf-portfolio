@@ -5,13 +5,15 @@ export interface IProject {
   images: string[];
   url?: string;
   isOnline: boolean;
-  industry: string; // <-- New field added
+  industry: string;
 }
 
 export interface IExperience {
   company: string;
   url?: string;
   role: string;
+  startDate: string; // New field
+  endDate: string; // New field
   projects: IProject[];
 }
 
@@ -36,7 +38,9 @@ export const config: PortfolioConfig = {
     {
       company: 'Clickpart',
       url: 'https://clickpart.co',
-      role: 'Full Stack Engineer | Nov 2022 - Present',
+      role: 'Full Stack Engineer',
+      startDate: 'Nov 2022',
+      endDate: 'Present',
       projects: [
         {
           title: 'Product Research Automation Tool',
@@ -96,7 +100,9 @@ export const config: PortfolioConfig = {
     {
       company: 'Levity',
       url: 'https://levity.ai',
-      role: 'Frontend Engineer | May 2022 - Sep 2022',
+      role: 'Frontend Engineer',
+      startDate: 'May 2022',
+      endDate: 'Sep 2022',
       projects: [
         {
           title: 'AI Training Interface',
@@ -123,14 +129,15 @@ export const config: PortfolioConfig = {
     {
       company: 'Gorila',
       url: 'https://gorila.com.br',
-      role: 'Tech Lead & Full Stack Engineer | Oct 2016 - Feb 2022',
+      role: 'Tech Lead & Full Stack Engineer',
+      startDate: 'Oct 2016',
+      endDate: 'Feb 2022',
       projects: [
          {
           title: 'Custom Push Notification System',
           description: 'As Tech Lead, guided a team in implementing a scalable push notification system using AWS (Lambda, SQS, SNS, DynamoDB) to engage ~100,000 active users. ',
           tech: ['AWS Lambda', 'SQS', 'SNS', 'DynamoDB'],
-          images: [
-          ],
+          images: [],
           isOnline: true,
           industry: 'Fintech',
         },
@@ -138,9 +145,7 @@ export const config: PortfolioConfig = {
           title: 'Advanced CI/CD Strategy for SPAs',
           description: 'Architected a CI/CD strategy using Bitbucket Pipelines that allowed multiple squads to independently deploy versioned Single Page Applications and shared libraries to a private NPM registry. ',
           tech: ['CI/CD', 'Bitbucket Pipelines', 'NPM', 'SPAs'],
-          images: [
-
-          ],
+          images: [],
           isOnline: true,
           industry: 'Fintech',
         },
@@ -148,9 +153,7 @@ export const config: PortfolioConfig = {
           title: 'Core System MVP from Scratch',
           description: 'As a founding engineer, built the company\'s core system from the ground up, launching the MVP in 6 weeks using Angular and Node.js, which supported acquiring the first 1,000 users. ',
           tech: ['Angular', 'Node.js', 'MVP', 'MongoDB'],
-          images: [
-
-          ],
+          images: [],
           isOnline: true,
           industry: 'Fintech',
         },
@@ -159,14 +162,15 @@ export const config: PortfolioConfig = {
     {
       company: 'Start Investimentos (became monetus)',
       url: 'https://web.archive.org/web/20151202014638/http://startinvestimentos.com:80/',
-      role: 'Founder and CTO | Sep 2015 - Jul 2016',
+      role: 'Founder and CTO',
+      startDate: 'Sep 2015',
+      endDate: 'Jul 2016',
       projects: [
         {
           title: 'Fintech Investment Platform',
           description: 'Led the design and development of the system\'s architecture, PHP/MySQL API, and Angular.js front-end, featuring automated web scraping and a user-logged area displaying key asset insights. ',
           tech: ['PHP', 'MySQL', 'Angular.js', 'Web Scraping', 'AWS'],
-          images: [
-          ],
+          images: [],
           isOnline: false,
           industry: 'Fintech',
         },
@@ -183,14 +187,15 @@ export const config: PortfolioConfig = {
     {
       company: 'finance-e.com',
       url:'https://web.archive.org/web/20141217050919/http://finance-e.com/',
-      role: 'Founder and CTO | Dec 2013 - Sep 2015',
+      role: 'Founder and CTO',
+      startDate: 'Dec 2013',
+      endDate: 'Sep 2015',
       projects: [
         {
           title: 'Financial Data & Analytics Platform',
           description: 'Designed the complete system architecture and led full-stack development using Angular.js, PHP, and MySQL for a platform centered around web scraping financial data sources to provide users with comprehensive asset information. ',
           tech: ['Angular.js', 'PHP', 'MySQL', 'AWS', 'Web Scraping'],
-          images: [
-          ],
+          images: [],
           isOnline: false,
           industry: 'Fintech',
         },
@@ -206,7 +211,9 @@ export const config: PortfolioConfig = {
     },
     {
         company: 'Freelancer',
-        role: 'Full Stack Engineer | Dec 2010 - Dec 2014',
+        role: 'Full Stack Engineer',
+        startDate: 'Dec 2010',
+        endDate: 'Dec 2014',
         projects: [
           {
             title: 'Corporate Website & Client Portal Gateway (for Tenap)',
