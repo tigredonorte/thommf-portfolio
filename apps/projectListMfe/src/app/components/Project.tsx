@@ -1,10 +1,12 @@
-import { IProject } from "@thommf-portfolio/config";
-import "./Project.scss";
 import { useState } from "react";
-import { LazyLoadImage } from "react-lazy-load-image-component";
 import { Carousel } from "react-responsive-carousel";
+import { LazyLoadImage } from "react-lazy-load-image-component";
+import { IProject } from "@thommf-portfolio/config";
 import Lightbox from "yet-another-react-lightbox";
+import "react-responsive-carousel/lib/styles/carousel.min.css";
 import "yet-another-react-lightbox/styles.css";
+import "./Project.scss";
+
 
 interface ProjectProps {
   project: IProject;

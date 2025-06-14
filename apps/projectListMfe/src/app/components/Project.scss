@@ -1,9 +1,10 @@
+/* apps/projectListMfe/src/app/Project.scss */
+
 .project-card {
   background: white;
   border: 1px solid #ddd;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 
@@ -12,29 +13,47 @@
     &:nth-child(odd) {
       flex-direction: row-reverse;
     }
+    height: 400px; 
   }
 
   &.no-image {
-    // When there's no image, make the card a simple block container
-    // instead of a flexbox row. This prevents weird alignment.
     display: block;
+    height: auto;
   }
 }
 
 .project-carousel {
   flex: 1 1 55%;
   min-width: 50%;
-  font-size: 0; // Removes unwanted whitespace gap below carousel
+  height: 100%;
+  font-size: 0;
 
-  .carousel .slide img {
-    height: 400px;
-    object-fit: cover;
+  .carousel-root,
+  .carousel.carousel-slider,
+  .slider-wrapper,
+  .slider {
+    height: 100%;
+  }
+
+  .carousel .slide {
+    height: 100%;
+    background: #f0f0f0;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
   }
 
   .lazy-load-image-background {
+    width: 100%;
+    height: 100%;
+    display: block !important;
     filter: blur(15px);
     transition: filter 0.3s;
   }
+
   .lazy-load-image-background.lazy-load-image-loaded {
     filter: blur(0);
   }
@@ -42,45 +61,75 @@
 
 .carousel-slide-container {
   cursor: pointer;
+  height: 100%;
+  width: 100%;
 }
 
 .project-details {
   flex: 1 1 45%;
   padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 
   h5 {
     margin-top: 0;
     font-size: 1.4rem;
     color: #333;
+    flex-shrink: 0;
   }
+  
   p {
     line-height: 1.6;
     color: #666;
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 1rem;
+    margin-bottom: 1rem;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: #ccc;
+      border-radius: 4px;
+      border: 2px solid white;
+    }
+    &::-webkit-scrollbar-thumb:hover {
+      background: #bbb;
+    }
   }
 
   &.full-width {
-    // The 'full-width' version of project-details doesn't need
-    // the flex properties of the two-column layout.
     padding: 2rem;
   }
 }
 
 .industry-tag {
   display: inline-block;
-  background-color: #f0f0f0;
-  color: #555;
-  padding: 0.25rem 0.75rem;
+  // FIX: Updated styles for a cleaner "pill" look
+  background-color: #e2e8f0;
+  color: #4a5568;
+  padding: 0.3rem 0.8rem;
   border-radius: 15px;
   font-size: 0.85rem;
   font-weight: 500;
   margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .tech-list {
-  margin-top: 1rem;
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid #f0f0f0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  flex-shrink: 0;
+
   span {
     background-color: #e0f7fa;
     color: #00796b;
