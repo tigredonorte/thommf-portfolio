@@ -1,7 +1,8 @@
+/* apps/headerMfe/src/app/app.scss */
 .header {
   background-color: #2a3d45;
   color: white;
-  padding: 1rem 2rem;
+  padding: 1rem 1.5rem; // Adjusted padding for mobile
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -11,22 +12,26 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  // --- End sticky ---
 }
 
 .brand {
   h1 {
     margin: 0;
-    font-size: 1.5rem;
+    font-size: 1.25rem; // Adjusted for mobile
   }
   p {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     opacity: 0.8;
   }
 }
 
-.header nav a {
+/* --- Desktop Navigation --- */
+.desktop-nav {
+  display: none; // Hidden on mobile by default
+}
+
+.desktop-nav a {
   color: white;
   margin-left: 1.5rem;
   text-decoration: none;
@@ -54,5 +59,90 @@
       background-color: #fff;
       border-radius: 2px;
     }
+  }
+}
+
+
+/* --- Mobile Menu --- */
+
+.menu-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: block; // Visible on mobile
+}
+
+.mobile-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(42, 61, 69, 0.98); // Slightly transparent background
+  backdrop-filter: blur(5px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(100%);
+  transition: transform 0.3s ease-in-out;
+  z-index: 30;
+
+  &.open {
+    transform: translateX(0);
+  }
+
+  nav {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+  }
+
+  a {
+    color: white;
+    font-size: 2rem;
+    text-decoration: none;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+
+    &:hover, &.active {
+      opacity: 1;
+    }
+  }
+}
+
+.close-menu {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+
+/* --- Media Query for Larger Screens --- */
+
+@media (min-width: 768px) {
+  .header {
+    padding: 1rem 2rem; // Restore original padding
+  }
+
+  .brand h1 {
+    font-size: 1.5rem; // Restore original font size
+  }
+
+  .brand p {
+    font-size: 0.9rem;
+  }
+
+  .desktop-nav {
+    display: block; // Show desktop nav
+  }
+
+  .menu-toggle {
+    display: none; // Hide hamburger button
   }
 }
