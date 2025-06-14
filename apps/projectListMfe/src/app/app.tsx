@@ -32,14 +32,13 @@ const highlightedTechnologies = [
   'Angular',
   'React',
   'Node.js',
-  'MySQL',
   'MongoDB',
+  'Fintech',
 ];
 
 export function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHighlighted, setHighlightedTechnology] = useState('');
-  
   const allSuggestions = useMemo(() => getAllSuggestions(), []);
 
   const handleFilterChange = useCallback((term: string) => {
@@ -56,7 +55,6 @@ export function App() {
     setHighlightedTechnology(term);
     setSearchTerm(term);
     
-    // Blur focus for highlighted filter buttons to prevent unwanted keyboard navigation
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
