@@ -2,6 +2,9 @@ import './app.scss';
 import { config } from '@thommf-portfolio/config';
 
 export function App() {
+  // Get the current path from the browser's URL
+  const currentPath = window.location.pathname;
+
   return (
     <header className="header">
       <div className="brand">
@@ -9,9 +12,16 @@ export function App() {
         <p>{config.developerRole}</p>
       </div>
       <nav>
-        <a href="/">Projects</a>
-        <a href={config.socials.github} target="_blank" rel="noopener noreferrer">GitHub</a>
-        <a href={config.socials.linkedin} target="_blank" rel="noopener noreferrer">LinkedIn</a>
+        {/* Conditionally apply the 'active' class if the path is the root */}
+        <a href="/" className={currentPath === '/' ? 'active' : ''}>
+          Projects
+        </a>
+        <a href={config.socials.github} target="_blank" rel="noopener noreferrer">
+          GitHub
+        </a>
+        <a href={config.socials.linkedin} target="_blank" rel="noopener noreferrer">
+          LinkedIn
+        </a>
       </nav>
     </header>
   );
