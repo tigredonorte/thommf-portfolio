@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import './HighlightedFilters.scss';
 
 interface HighlightedFiltersProps {
@@ -6,7 +7,7 @@ interface HighlightedFiltersProps {
   onFilterSelect: (tech: string) => void;
 }
 
-export const HighlightedFilters = ({
+export const HighlightedFilters = memo(({
   technologies,
   activeFilter,
   onFilterSelect,
@@ -26,4 +27,6 @@ export const HighlightedFilters = ({
       </div>
     </div>
   );
-};
+});
+
+HighlightedFilters.displayName = 'HighlightedFilters';

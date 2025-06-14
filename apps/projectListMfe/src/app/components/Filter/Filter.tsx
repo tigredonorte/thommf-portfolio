@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import './Filter.scss';
 
 export interface Suggestion {
@@ -14,7 +14,7 @@ interface FilterProps {
   children?: React.ReactNode;
 }
 
-export const Filter = ({
+export const Filter = memo(({
   searchTerm,
   onSearchChange,
   suggestions,
@@ -127,7 +127,7 @@ export const Filter = ({
           <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
 
-        <div className="search-input inline-suggestion-display">
+        <div className="inline-suggestion-display">
           <span className="user-text-twin">{searchTerm}</span>
           <span className="ghost-text">{suggestionRemainder}</span>
         </div>
@@ -166,4 +166,6 @@ export const Filter = ({
       {children}
     </div>
   );
-};
+});
+
+Filter.displayName = 'Filter';

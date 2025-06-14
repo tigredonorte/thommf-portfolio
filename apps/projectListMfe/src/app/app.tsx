@@ -1,5 +1,5 @@
 import { config } from '@thommf-portfolio/config';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import './app.scss';
 import { Experience } from './components/Experience';
 import { Filter, Suggestion, HighlightedFilters } from './components/Filter';
@@ -38,14 +38,29 @@ const highlightedTechnologies = [
 
 export function App() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedHighlighted, setHighlightedTechnology] = useState('');
+  
   const allSuggestions = useMemo(() => getAllSuggestions(), []);
 
-  const handleFilterChange = (term: string) => {
+  const handleFilterChange = useCallback((term: string) => {
     setSearchTerm(term);
+  }, []);
+
+  const handleHighlightedFilterSelect = useCallback((term: string) => {
+    if (selectedHighlighted === term) {
+      setHighlightedTechnology('');
+      setSearchTerm('');
+      return;
+    }
+
+    setHighlightedTechnology(term);
+    setSearchTerm(term);
+    
+    // Blur focus for highlighted filter buttons to prevent unwanted keyboard navigation
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-  };
+  }, [selectedHighlighted]);
 
   const filteredSuggestions = useMemo(() => {
     if (!searchTerm) return [];
@@ -105,7 +120,7 @@ export function App() {
       >
         <HighlightedFilters
           technologies={highlightedTechnologies}
-          onFilterSelect={handleFilterChange}
+          onFilterSelect={handleHighlightedFilterSelect}
           activeFilter={searchTerm}
         />
       </Filter>
