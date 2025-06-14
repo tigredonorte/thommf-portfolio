@@ -1,0 +1,92 @@
+.project-card {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+
+  @media (min-width: 768px) {
+    flex-direction: row;
+    &:nth-child(odd) {
+      flex-direction: row-reverse;
+    }
+  }
+
+  &.no-image {
+    // When there's no image, make the card a simple block container
+    // instead of a flexbox row. This prevents weird alignment.
+    display: block;
+  }
+}
+
+.project-carousel {
+  flex: 1 1 55%;
+  min-width: 50%;
+  font-size: 0; // Removes unwanted whitespace gap below carousel
+
+  .carousel .slide img {
+    height: 400px;
+    object-fit: cover;
+  }
+
+  .lazy-load-image-background {
+    filter: blur(15px);
+    transition: filter 0.3s;
+  }
+  .lazy-load-image-background.lazy-load-image-loaded {
+    filter: blur(0);
+  }
+}
+
+.carousel-slide-container {
+  cursor: pointer;
+}
+
+.project-details {
+  flex: 1 1 45%;
+  padding: 2rem;
+
+  h5 {
+    margin-top: 0;
+    font-size: 1.4rem;
+    color: #333;
+  }
+  p {
+    line-height: 1.6;
+    color: #666;
+  }
+
+  &.full-width {
+    // The 'full-width' version of project-details doesn't need
+    // the flex properties of the two-column layout.
+    padding: 2rem;
+  }
+}
+
+.industry-tag {
+  display: inline-block;
+  background-color: #f0f0f0;
+  color: #555;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.tech-list {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  span {
+    background-color: #e0f7fa;
+    color: #00796b;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+}

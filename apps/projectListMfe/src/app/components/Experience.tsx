@@ -1,5 +1,6 @@
-import { useExperience } from "./ExperienceContext";
+import { useExperience } from "../contexts/ExperienceContext";
 import { Project } from "./Project";
+import "./Experience.scss";
 
 export const Experience = () => {
   const experience = useExperience().experience;

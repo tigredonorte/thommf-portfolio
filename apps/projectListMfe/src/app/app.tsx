@@ -2,7 +2,7 @@ import { config } from '@thommf-portfolio/config';
 import 'react-lazy-load-image-component/src/effects/blur.css';
 import 'react-responsive-carousel/lib/styles/carousel.min.css';
 import './app.scss';
-import { Experience } from './contexts/Experience';
+import { Experience } from './components/Experience';
 import { ExperienceProvider } from './contexts/ExperienceContext';
 
 export function App() {

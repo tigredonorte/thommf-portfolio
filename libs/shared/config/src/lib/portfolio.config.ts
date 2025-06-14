@@ -54,7 +54,9 @@ export const config: PortfolioConfig = {
           title: 'Event-Driven Backend Services',
           description: 'Enhanced API responsiveness and system resilience by implementing a MongoDB-based event-driven system to handle asynchronous tasks like sending order confirmation emails in the background. ',
           tech: ['Node.js', 'MongoDB', 'Event-Driven'],
-          images: ['https://picsum.photos/seed/clickpart3/800/600'],
+          images: [
+            '/assets/images/clickpart/event-driven-1.png',
+          ],
           isOnline: true,
           industry: 'E-commerce & Supply Chain',
         },
@@ -62,7 +64,7 @@ export const config: PortfolioConfig = {
           title: 'CI/CD Pipeline Overhaul',
           description: 'Boosted developer productivity and enabled faster feedback cycles by overhauling CI/CD pipelines, reducing execution time by ~67% (from 30 to 10 minutes)  through the implementation of parallel processing for integration tests. ',
           tech: ['CI/CD', 'Bitbucket Pipelines', 'Bash'],
-          images: ['https://picsum.photos/seed/clickpart4/800/600'],
+          images: [],
           isOnline: true,
           industry: 'DevOps & Software Tooling',
         },
@@ -71,8 +73,7 @@ export const config: PortfolioConfig = {
           description: 'Initiated the product research automation process by integrating Google Spreadsheets with company APIs via Google AppScript to retrieve SERP data. This first phase reduced initial research time from 50 to 30 minutes and included a migration script for seamless updates.',
           tech: ['Google Sheets', 'Google AppScript', 'Automation'],
           images: [
-            'https://picsum.photos/seed/clickpart5/800/600',
-          ],
+            '/assets/images/clickpart/spreadsheets-1.png'],
           isOnline: true,
           industry: 'MarTech & Automation',
         },
@@ -93,7 +94,7 @@ export const config: PortfolioConfig = {
       ],
     },
     {
-      company: 'Levitys',
+      company: 'Levity',
       url: 'https://levity.ai',
       role: 'Frontend Engineer | May 2022 - Sep 2022',
       projects: [
@@ -103,7 +104,6 @@ export const config: PortfolioConfig = {
           tech: ['React', 'GraphQL', 'Figma', 'Pagination'],
           images: [
             '/assets/images/levity/levity-1.png',
-            '/assets/images/levity/levity-2.png',
           ],
           isOnline: true,
           industry: 'AI / No-Code Platform',
@@ -113,7 +113,6 @@ export const config: PortfolioConfig = {
           description: 'Refactored critical components and resolved key bugs, notably improving the UX usability of components used for editing labels by making interactions more intuitive. ',
           tech: ['React', 'UX/UI', 'Bug Fixing'],
           images: [
-            '/assets/images/levity/levity-1.png',
             '/assets/images/levity/levity-2.png',
           ],
           isOnline: true,
@@ -167,8 +166,6 @@ export const config: PortfolioConfig = {
           description: 'Led the design and development of the system\'s architecture, PHP/MySQL API, and Angular.js front-end, featuring automated web scraping and a user-logged area displaying key asset insights. ',
           tech: ['PHP', 'MySQL', 'Angular.js', 'Web Scraping', 'AWS'],
           images: [
-            'https://picsum.photos/seed/start1/800/600',
-            'https://picsum.photos/seed/start2/800/600',
           ],
           isOnline: false,
           industry: 'Fintech',
@@ -177,7 +174,7 @@ export const config: PortfolioConfig = {
           title: 'Automated Data Import Service',
           description: 'Developed a critical web service for importing data from CVM (Brazilian SEC equivalent), enabling the automated collection of information from 11,000+ investment funds and 500+ stocks. ',
           tech: ['PHP', 'Web Service', 'Data Processing'],
-          images: ['https://picsum.photos/seed/start3/800/600'],
+          images: [],
           isOnline: false,
           industry: 'Fintech',
         },
@@ -193,8 +190,6 @@ export const config: PortfolioConfig = {
           description: 'Designed the complete system architecture and led full-stack development using Angular.js, PHP, and MySQL for a platform centered around web scraping financial data sources to provide users with comprehensive asset information. ',
           tech: ['Angular.js', 'PHP', 'MySQL', 'AWS', 'Web Scraping'],
           images: [
-            'https://picsum.photos/seed/financee1/800/600',
-            'https://picsum.photos/seed/financee2/800/600',
           ],
           isOnline: false,
           industry: 'Fintech',
@@ -203,7 +198,7 @@ export const config: PortfolioConfig = {
           title: 'High-Availability AWS Infrastructure',
           description: 'Architected and managed the company\'s AWS infrastructure from the ground up, utilizing EC2 with Auto Scaling, ELB, S3, and a highly available Multi-AZ RDS setup to achieve 99.5% uptime. ',
           tech: ['AWS EC2', 'Auto Scaling', 'ELB', 'RDS', 'CloudWatch'],
-          images: ['https://picsum.photos/seed/financee3/800/600'],
+          images: [],
           isOnline: false,
           industry: 'Fintech',
         },
@@ -229,16 +224,16 @@ export const config: PortfolioConfig = {
             title: 'Construction Progress Tracking System (for Tenap)',
             description: 'Developed a web application using PHP and JavaScript that allowed engineers to monitor building progress, centralizing communication and making progress monitoring easier for the client. ',
             tech: ['PHP', 'MySQL', 'JavaScript'],
-            images: ['https://picsum.photos/seed/freela1/800/600'],
+            images: [],
             url: 'https://web.archive.org/web/20160606100559/http://tele.tenap.com.br/?url=ocorrencia/info&refer=b2NvcnJlbmNpYS9pbmRleC9pbmRleA==',
             isOnline: false,
             industry: 'Construction & Engineering',
           },
           {
             title: 'Kindergarten Management System',
-            description: 'Gathered client requirements and delivered a student and communications management system for a kindergarten. ',
-            tech: ['PHP', 'JavaScript', 'Requirement Analysis'],
-            images: ['https://picsum.photos/seed/freela2/800/600'],
+            description: 'Translated client needs into a custom management system for a kindergarten, designed to streamline daily operations and enhance parent-teacher communication. The platform featured modules for student enrollment, attendance tracking, and a secure portal for sharing updates and messages with parents. The implementation centralized student information, replacing inefficient paper-based processes and significantly reducing daily administrative overhead. This led to improved data accuracy and increased parent engagement and satisfaction due to more reliable, real-time communication.',
+            tech: ['PHP', 'JavaScript', 'Requirement Analysis', 'JQuery'],
+            images: [],
             url: 'http://bellobambino.net',
             isOnline: false,
             industry: 'Education',
@@ -251,7 +246,8 @@ export const config: PortfolioConfig = {
               "Angular.js",
               "MySQL",
               "Inventory Management",
-              "Transactions"
+              "Transactions",
+              'JQuery'
             ],
             images: [
               '/assets/images/magie/magie-1.png',
@@ -262,6 +258,14 @@ export const config: PortfolioConfig = {
             url: 'https://magie.magieacessorios.com.br/',
             isOnline: true,
             industry: 'Retail & E-commerce',
+          },
+          {
+            title: 'Event Registration & Sales Tracking System (for heternal)',
+            description: 'Developed a custom event management application that served as both a registration portal and a sales tracking tool for event promoters. The system empowered sellers to register participants for in-person events, attributing each registration to the respective seller. It also included a secure admin interface for on-site staff to manage a real-time check-in process. This solution replaced manual, spreadsheet-based methods, eliminating data entry errors and providing the company with instant, reliable data on event attendance and sales performance per promoter. The on-site check-in tool also significantly reduced attendee wait times, improving the overall event experience.',
+            tech: ['PHP', 'MySQL', 'JavaScript', 'Event Management', 'Sales Tracking'],
+            images: [],
+            isOnline: false,
+            industry: 'Event Management & Sales',
           },
         ]
     }
