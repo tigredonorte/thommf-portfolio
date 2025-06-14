@@ -11,3 +11,18 @@
   padding-bottom: 1rem;
   margin-bottom: 2rem;
 }
+
+.no-results {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #666;
+
+  h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  p {
+    font-size: 1rem;
+  }
+}
