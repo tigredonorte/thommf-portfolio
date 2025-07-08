@@ -1,0 +1,37 @@
+# AWS Configuration
+aws_region = "us-east-1"
+
+# S3 Bucket Configuration
+# IMPORTANT: S3 bucket names must be globally unique!
+# Note: With tag-based access control, bucket name can be any unique name
+bucket_name = "thommf-portfolio-static-site"
+
+# Deployment Environment (prod, dev, staging)
+environment = "prod"
+
+# Resource Tagging - MUST be 'frontend' for IAM policy compliance
+resource_tag_environment = "frontend"
+
+# CloudFront Configuration
+cloudfront_price_class = "PriceClass_100"
+
+# IAM Configuration
+create_iam_resources = true
+frontend_deployer_username = "frontend-deployer"
+create_access_keys = false  # Set to true only for testing - use OIDC for production
+
+# Custom Domain Configuration (Optional)
+# Uncomment and configure these if you want to use a custom domain
+# domain_names = ["yourdomain.com", "www.yourdomain.com"]
+# ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+# hosted_zone_id = "Z123456789012345678901"
+
+# Additional Tags
+tags = {
+  Owner   = "thommf"
+  Project = "portfolio"
+}
+
+# Static Asset Cache Configuration (Optional)
+# Override the default list of file patterns for long-term caching
+# static_asset_cache_patterns = ["*.css", "*.js", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.woff", "*.woff2", "*.ttf", "*.eot"]
