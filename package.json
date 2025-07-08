@@ -10,7 +10,11 @@
     "e2e": "nx run-many --target=e2e --all",
     "format": "nx format:write",
     "format:check": "nx format:check",
-    "prettier": "nx format:write"
+    "prettier": "nx format:write",
+    "deploy": "./infra/deploy.sh",
+    "deploy:infra": "./infra/deploy.sh infrastructure-only",
+    "deploy:build": "./infra/deploy.sh build-only",
+    "deploy:upload": "./infra/deploy.sh upload-only"
   },
   "private": true,
   "dependencies": {

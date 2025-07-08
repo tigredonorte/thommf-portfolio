@@ -8,23 +8,18 @@ import baseConfig from './module-federation.config';
 const prodConfig: ModuleFederationConfig = {
   ...baseConfig,
   /*
-   * Remote overrides for production.
-   * Each entry is a pair of a unique name and the URL where it is deployed.
-   *
-   * e.g.
+   * For static deployment (S3), we'll include the remotes as part of the build
+   * so everything is bundled together as a standalone application.
+   * 
+   * If you want to deploy micro-frontends separately, you would configure
+   * the remotes to point to their deployed URLs:
+   * 
    * remotes: [
-   *   ['app1', 'http://app1.example.com'],
-   *   ['app2', 'http://app2.example.com'],
-   * ]
-   *
-   * You can also use a full path to the remoteEntry.js file if desired.
-   *
-   * remotes: [
-   *   ['app1', 'http://example.com/path/to/app1/remoteEntry.js'],
-   *   ['app2', 'http://example.com/path/to/app2/remoteEntry.js'],
+   *   ['headerMfe', 'https://your-header-mfe-domain.com/remoteEntry.js'],
+   *   ['projectListMfe', 'https://your-projectlist-mfe-domain.com/remoteEntry.js'],
    * ]
    */
-  remotes: [],
+  remotes: baseConfig.remotes,
 };
 
 // Nx plugins for webpack to build config object from Nx options and context.
