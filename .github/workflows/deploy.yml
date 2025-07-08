@@ -1,0 +1,162 @@
+name: Deploy Portfolio to AWS
+
+# Note: GitHub Actions will show warnings about missing secrets until you configure them.
+# See .github/DEPLOYMENT.md for setup instructions.
+# These warnings are safe to ignore if you're not using GitHub Actions for deployment.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSION: 1.7.0
+
+jobs:
+  # Reuse the CI workflow for build/test/lint
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  # Upload build artifacts for deployment
+  build-for-deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    if: needs.ci.result == 'success' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          filter: tree:0
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build project
+        run: npx nx build container
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-files
+          path: apps/container/dist/
+          retention-days: 7
+
+  terraform-plan:
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.event_name == 'pull_request' && needs.ci.result == 'success'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+        continue-on-error: true
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+        continue-on-error: true
+
+      - name: Terraform Format Check
+        working-directory: infra/terraform
+        run: terraform fmt -check
+        continue-on-error: true
+
+      - name: Terraform Validate
+        working-directory: infra/terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: infra/terraform
+        run: terraform plan
+        env:
+          TF_VAR_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+        continue-on-error: true
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-for-deploy
+    if: github.ref == 'refs/heads/main' && needs.build-for-deploy.result == 'success'
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-files
+          path: apps/container/dist/
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve
+        env:
+          TF_VAR_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_domain_names: ${{ secrets.DOMAIN_NAMES }}
+          TF_VAR_ssl_certificate_arn: ${{ secrets.SSL_CERTIFICATE_ARN }}
+          TF_VAR_hosted_zone_id: ${{ secrets.HOSTED_ZONE_ID }}
+
+      - name: Get Terraform outputs
+        working-directory: infra/terraform
+        id: terraform-outputs
+        run: |
+          echo "bucket-name=$(terraform output -raw s3_bucket_name)" >> $GITHUB_OUTPUT
+          echo "cloudfront-id=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+          echo "website-url=$(terraform output -raw website_url)" >> $GITHUB_OUTPUT
+
+      - name: Sync files to S3
+        run: |
+          aws s3 sync apps/container/dist/ s3://${{ steps.terraform-outputs.outputs.bucket-name }}/ --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.terraform-outputs.outputs.cloudfront-id }} \
+            --paths "/*"
+
+      - name: Display deployment info
+        run: |
+          echo "🎉 Deployment successful!"
+          echo "Website URL: ${{ steps.terraform-outputs.outputs.website-url }}"
+          echo "Note: CloudFront deployment can take 10-15 minutes to propagate globally."
+
