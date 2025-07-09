@@ -1,0 +1,101 @@
+# name: Deploy Application
+
+# on:
+#   push:
+#     branches: [main]
+#     paths:
+#       - 'apps/**'
+#       - 'libs/**'
+#       - 'package.json'
+#       - 'pnpm-lock.yaml'
+#   pull_request:
+#     branches: [main]
+#     paths:
+#       - 'apps/**'
+#       - 'libs/**'
+#       - 'package.json'
+#       - 'pnpm-lock.yaml'
+#   workflow_run:
+#     workflows: ["Deploy Infrastructure"]
+#     types: [completed]
+#     branches: [main]
+#   workflow_dispatch: # Allow manual trigger
+#     inputs:
+#       environment:
+#         description: 'Environment to deploy to'
+#         required: true
+#         default: 'Production'
+#         type: choice
+#         options:
+#           - Production
+#           - Development
+
+# env:
+#   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+#   DEPLOY_ON_PR: ${{ vars.DEPLOY_ON_PR || 'true' }}
+
+# permissions:
+#   id-token: write # Required for OIDC
+#   contents: read # Required for actions/checkout
+#   actions: read # Required for reusable workflows
+
+# jobs:
+#   # Deploy infrastructure first if needed (includes CI)
+#   infrastructure:
+#     uses: ./.github/workflows/deploy-infra.yml
+#     secrets: inherit
+
+#   # Deploy the application to S3
+#   deploy:
+#     needs: [infrastructure]
+#     runs-on: ubuntu-latest
+#     environment: ${{ github.event.inputs.environment || 'Production' }}
+#     if: |
+#       (needs.infrastructure.result == 'success' || needs.infrastructure.result == 'skipped') &&
+#       (github.ref == 'refs/heads/main' || github.event_name == 'pull_request') &&
+#       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+#     steps:
+#       - name: Check PR deployment setting
+#         if: github.event_name == 'pull_request' && env.DEPLOY_ON_PR != 'true'
+#         run: |
+#           echo "❌ PR deployments are disabled. Set DEPLOY_ON_PR=true to enable."
+#           exit 1
+      
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+#       - uses: pnpm/action-setup@v4
+
+#       - uses: actions/setup-node@v4
+#         with:
+#           node-version: 20
+#           cache: 'pnpm'
+#       - run: pnpm install --frozen-lockfile
+
+#       - name: Build application
+#         run: npx nx build container
+
+#       - name: Configure AWS credentials
+#         uses: aws-actions/configure-aws-credentials@v4
+#         with:
+#           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+#           aws-region: ${{ env.AWS_REGION }}
+
+#       - name: Sync files to S3
+#         run: |
+#           aws s3 sync apps/container/dist/ s3://${{ vars.S3_BUCKET_NAME }}/ --delete
+
+#       - name: Get website URL
+#         id: get-url
+#         run: |
+#           WEBSITE_ENDPOINT=$(aws s3api get-bucket-website --bucket ${{ vars.S3_BUCKET_NAME }} --query 'RoutingRules[0].Redirect.HostName' --output text 2>/dev/null || echo "")
+#           if [ "$WEBSITE_ENDPOINT" = "None" ] || [ -z "$WEBSITE_ENDPOINT" ]; then
+#             WEBSITE_ENDPOINT="${{ vars.S3_BUCKET_NAME }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+#           fi
+#           echo "website-url=http://$WEBSITE_ENDPOINT" >> $GITHUB_OUTPUT
+
+#       - name: Display deployment info
+#         run: |
+#           echo "🎉 Application deployment successful!"
+#           echo "🌍 Environment: ${{ github.event.inputs.environment || 'Production' }}"
+#           echo "📦 App files synced to S3 bucket: ${{ vars.S3_BUCKET_NAME }}"
+#           echo "🌐 Website URL: ${{ steps.get-url.outputs.website-url }}"

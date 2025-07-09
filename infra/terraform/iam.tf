@@ -12,9 +12,7 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
         Sid    = "S3BucketManagement"
         Effect = "Allow"
         Action = [
-          "s3:CreateBucket",
           "s3:DeleteBucket",
-          "s3:GetBucketLocation",
           "s3:GetBucketPolicy",
           "s3:GetBucketVersioning",
           "s3:GetBucketWebsite",
@@ -25,18 +23,14 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
           "s3:PutBucketPublicAccessBlock"
         ]
         Resource = "arn:aws:s3:::*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Environment" = "frontend"
-          }
-        }
       },
       {
         Sid    = "S3BucketCreation"
         Effect = "Allow"
         Action = [
           "s3:CreateBucket",
-          "s3:PutBucketTagging"
+          "s3:PutBucketTagging",
+          "s3:GetBucketTagging"
         ]
         Resource = "arn:aws:s3:::*"
       },
@@ -50,25 +44,6 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
           "s3:PutObjectAcl"
         ]
         Resource = "arn:aws:s3:::*/*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Environment" = "frontend"
-          }
-        }
-      },
-      {
-        Sid    = "S3TaggingOperations"
-        Effect = "Allow"
-        Action = [
-          "s3:GetBucketTagging",
-          "s3:PutBucketTagging"
-        ]
-        Resource = "arn:aws:s3:::*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Environment" = "frontend"
-          }
-        }
       },
       {
         Sid    = "S3ListBucketsForConsole"
@@ -83,7 +58,6 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
         Sid    = "CloudFrontDistributionManagement"
         Effect = "Allow"
         Action = [
-          "cloudfront:CreateDistribution",
           "cloudfront:DeleteDistribution",
           "cloudfront:GetDistribution",
           "cloudfront:GetDistributionConfig",
@@ -93,18 +67,12 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
           "cloudfront:ListInvalidations"
         ]
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Environment" = "frontend"
-          }
-        }
       },
       {
         Sid    = "CloudFrontDistributionCreation"
         Effect = "Allow"
         Action = [
-          "cloudfront:CreateDistribution",
-          "cloudfront:TagResource"
+          "cloudfront:CreateDistribution"
         ]
         Resource = "*"
       },
@@ -118,20 +86,6 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
           "cloudfront:DeleteOriginAccessControl"
         ]
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Environment" = "frontend"
-          }
-        }
-      },
-      {
-        Sid    = "CloudFrontOriginAccessControlCreation"
-        Effect = "Allow"
-        Action = [
-          "cloudfront:CreateOriginAccessControl",
-          "cloudfront:TagResource"
-        ]
-        Resource = "*"
       },
       {
         Sid    = "CloudFrontTaggingOperations"
@@ -142,11 +96,6 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
           "cloudfront:UntagResource"
         ]
         Resource = "*"
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Environment" = "frontend"
-          }
-        }
       },
       {
         Sid    = "CloudFrontListOperations"
@@ -168,11 +117,6 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
           "arn:aws:route53:::hostedzone/*",
           "arn:aws:route53:::change/*"
         ]
-        Condition = {
-          StringEquals = {
-            "aws:ResourceTag/Environment" = "frontend"
-          }
-        }
       },
       {
         Sid    = "Route53ReadOperations"
