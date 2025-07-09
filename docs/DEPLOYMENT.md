@@ -1,14 +1,33 @@
 # GitHub Actions Setup Guide
 
-This guide explains how to configure GitHub secrets for automated deployment.
+This guide explains how to configure GitHub for automated deployment using either OIDC (recommended) or AWS access keys.
 
-## Required GitHub Secrets
+## 🚀 **Option 1: OIDC Authentication (Recommended)**
+
+**OpenID Connect (OIDC)** provides secure, temporary credentials without storing long-lived AWS access keys.
+
+### Benefits:
+- ✅ No AWS access keys stored in GitHub
+- ✅ Temporary credentials that expire automatically  
+- ✅ Fine-grained permissions based on repository/branch
+- ✅ Better security and audit trail
+
+### Quick Setup:
+1. **Configure Terraform** with OIDC enabled
+2. **Deploy infrastructure** to create the OIDC provider and role
+3. **Add one GitHub secret**: `AWS_ROLE_ARN`
+
+**📋 [Complete OIDC Setup Guide →](OIDC_SETUP.md)**
+
+---
+
+## 🔑 **Option 2: AWS Access Keys (Legacy)**
+
+If you prefer using traditional AWS access keys:
+
+### Required GitHub Secrets
 
 To use the GitHub Actions workflow for deployment, you need to add these secrets to your repository:
-
-### 🔑 **Required Secrets**
-
-Go to **Settings → Secrets and variables → Actions** in your GitHub repository and add:
 
 #### **AWS Credentials** (Required for deployment)
 - **`AWS_ACCESS_KEY_ID`** - Your AWS Access Key ID

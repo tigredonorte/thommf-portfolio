@@ -36,13 +36,13 @@ variable "domain_names" {
 variable "ssl_certificate_arn" {
   description = "ARN of the SSL certificate in ACM (required if using custom domain)"
   type        = string
-  default     = null
+  default     = ""
 }
 
 variable "hosted_zone_id" {
   description = "Route 53 hosted zone ID (required if using custom domain)"
   type        = string
-  default     = null
+  default     = ""
 }
 
 variable "cloudfront_price_class" {
@@ -66,19 +66,13 @@ variable "tags" {
 }
 
 variable "frontend_deployer_username" {
-  description = "Username for the frontend deployer IAM user"
+  description = "Username for the frontend deployer role"
   type        = string
   default     = "frontend-deployer"
 }
 
-variable "create_access_keys" {
-  description = "Whether to create access keys for the frontend deployer user (not recommended for production - use OIDC instead)"
-  type        = bool
-  default     = false
-}
-
 variable "create_iam_resources" {
-  description = "Whether to create IAM policy and user (set to false if they already exist)"
+  description = "Whether to create IAM policy and role (set to false if they already exist)"
   type        = bool
   default     = true
 }
@@ -87,4 +81,19 @@ variable "static_asset_cache_patterns" {
   description = "List of path patterns for static assets that should have long cache times"
   type        = list(string)
   default     = ["*.css", "*.js", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.svg", "*.ico", "*.woff", "*.woff2", "*.ttf", "*.eot"]
+}
+
+variable "use_oidc" {
+  description = "Whether to use OIDC for GitHub Actions authentication instead of access keys"
+  type        = bool
+  default     = true
+}
+
+variable "github_repository" {
+  description = "GitHub repository in the format 'owner/repo' for OIDC authentication"
+  type        = string
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$", var.github_repository))
+    error_message = "github_repository must be in the format 'owner/repo' (e.g., 'username/my-repo')."
+  }
 }

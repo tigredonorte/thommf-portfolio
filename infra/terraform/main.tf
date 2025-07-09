@@ -145,9 +145,9 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
 
   viewer_certificate {
     cloudfront_default_certificate = length(var.domain_names) == 0
-    acm_certificate_arn            = length(var.domain_names) > 0 ? var.ssl_certificate_arn : null
-    ssl_support_method             = length(var.domain_names) > 0 ? "sni-only" : null
-    minimum_protocol_version       = length(var.domain_names) > 0 ? "TLSv1.2_2021" : null
+    acm_certificate_arn            = length(var.domain_names) > 0 && var.ssl_certificate_arn != "" ? var.ssl_certificate_arn : null
+    ssl_support_method             = length(var.domain_names) > 0 && var.ssl_certificate_arn != "" ? "sni-only" : null
+    minimum_protocol_version       = length(var.domain_names) > 0 && var.ssl_certificate_arn != "" ? "TLSv1.2_2021" : null
   }
 
   tags = {
@@ -185,7 +185,7 @@ resource "aws_s3_bucket_policy" "portfolio_bucket_policy" {
 
 # Route 53 DNS records (optional - only if using custom domain)
 resource "aws_route53_record" "portfolio_record" {
-  count   = length(var.domain_names)
+  count   = length(var.domain_names) > 0 && var.hosted_zone_id != "" ? length(var.domain_names) : 0
   zone_id = var.hosted_zone_id
   name    = var.domain_names[count.index]
   type    = "A"
@@ -199,7 +199,7 @@ resource "aws_route53_record" "portfolio_record" {
 
 # Route 53 AAAA record for IPv6 (optional)
 resource "aws_route53_record" "portfolio_record_ipv6" {
-  count   = length(var.domain_names)
+  count   = length(var.domain_names) > 0 && var.hosted_zone_id != "" ? length(var.domain_names) : 0
   zone_id = var.hosted_zone_id
   name    = var.domain_names[count.index]
   type    = "AAAA"

@@ -156,6 +156,9 @@ aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
 | `hosted_zone_id` | Route 53 hosted zone ID | `null` | No* |
 | `cloudfront_price_class` | CloudFront price class | `PriceClass_100` | No |
 | `static_asset_cache_patterns` | File patterns for long-term caching | `["*.css", "*.js", "*.png", ...]` | No |
+| `github_repository` | GitHub repository for OIDC (format: owner/repo) | - | Yes |
+| `create_iam_resources` | Whether to create IAM policy and role | `true` | No |
+| `frontend_deployer_username` | Username for the deployer role | `frontend-deployer` | No |
 
 *Required if using custom domain
 
@@ -164,6 +167,17 @@ aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
 - `PriceClass_All`: All edge locations (highest cost, best performance)
 - `PriceClass_200`: North America, Europe, Asia, Middle East, and Africa
 - `PriceClass_100`: North America and Europe only (lowest cost)
+
+### Authentication
+
+This Terraform configuration uses **OIDC (OpenID Connect)** for secure GitHub Actions authentication:
+
+- ✅ **Secure**: No long-lived AWS access keys
+- ✅ **Modern**: Uses temporary, automatically-expiring credentials
+- ✅ **Auditable**: AWS CloudTrail shows GitHub context
+- ✅ **Repository-scoped**: Only your specific GitHub repository can assume the role
+
+**📋 [OIDC Setup Guide →](../../docs/OIDC_SETUP.md)**
 
 ## Custom Domain Setup
 

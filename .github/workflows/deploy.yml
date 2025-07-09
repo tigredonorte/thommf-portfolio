@@ -15,6 +15,10 @@ env:
   AWS_REGION: us-east-1
   TERRAFORM_VERSION: 1.7.0
 
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read    # Required for actions/checkout
+
 jobs:
   # Reuse the CI workflow for build/test/lint
   ci:
@@ -70,20 +74,17 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
         continue-on-error: true
 
       - name: Terraform Init
         working-directory: infra/terraform
         run: terraform init
-        continue-on-error: true
 
       - name: Terraform Format Check
         working-directory: infra/terraform
         run: terraform fmt -check
-        continue-on-error: true
 
       - name: Terraform Validate
         working-directory: infra/terraform
@@ -94,7 +95,6 @@ jobs:
         run: terraform plan
         env:
           TF_VAR_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
-        continue-on-error: true
 
   deploy:
     runs-on: ubuntu-latest
@@ -113,8 +113,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Download build artifacts

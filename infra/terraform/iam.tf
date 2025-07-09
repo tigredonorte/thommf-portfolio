@@ -204,32 +204,3 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
     Project     = "thommf-portfolio"
   }
 }
-
-# IAM User for Frontend Deployment
-resource "aws_iam_user" "frontend_deployer" {
-  count = var.create_iam_resources ? 1 : 0
-
-  name = var.frontend_deployer_username
-  path = "/"
-
-  tags = {
-    Name        = "Frontend Deployer User"
-    Environment = var.resource_tag_environment
-    Project     = "thommf-portfolio"
-    Purpose     = "CI/CD deployment for frontend applications"
-  }
-}
-
-# Attach the policy to the user
-resource "aws_iam_user_policy_attachment" "frontend_deployer_policy_attachment" {
-  count = var.create_iam_resources ? 1 : 0
-
-  user       = aws_iam_user.frontend_deployer[0].name
-  policy_arn = aws_iam_policy.frontend_deployer_policy[0].arn
-}
-
-# Optional: Create access keys (not recommended for production - use OIDC instead)
-resource "aws_iam_access_key" "frontend_deployer_key" {
-  count = var.create_iam_resources && var.create_access_keys ? 1 : 0
-  user  = aws_iam_user.frontend_deployer[0].name
-}

@@ -43,30 +43,19 @@ output "cloudfront_invalidation_command" {
   value       = "aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.portfolio_distribution.id} --paths '/*'"
 }
 
-# IAM Policy and User outputs
+# IAM Policy and Role outputs
 output "frontend_deployer_policy_arn" {
   description = "ARN of the frontend deployer IAM policy"
   value       = var.create_iam_resources ? aws_iam_policy.frontend_deployer_policy[0].arn : null
 }
 
-output "frontend_deployer_user_name" {
-  description = "Name of the frontend deployer IAM user"
-  value       = var.create_iam_resources ? aws_iam_user.frontend_deployer[0].name : null
+# OIDC outputs
+output "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions OIDC role"
+  value       = var.create_iam_resources ? aws_iam_role.github_actions_role[0].arn : null
 }
 
-output "frontend_deployer_user_arn" {
-  description = "ARN of the frontend deployer IAM user"
-  value       = var.create_iam_resources ? aws_iam_user.frontend_deployer[0].arn : null
-}
-
-output "frontend_deployer_access_key_id" {
-  description = "Access key ID for the frontend deployer user (if created)"
-  value       = var.create_iam_resources && var.create_access_keys ? aws_iam_access_key.frontend_deployer_key[0].id : null
-  sensitive   = true
-}
-
-output "frontend_deployer_secret_access_key" {
-  description = "Secret access key for the frontend deployer user (if created)"
-  value       = var.create_iam_resources && var.create_access_keys ? aws_iam_access_key.frontend_deployer_key[0].secret : null
-  sensitive   = true
+output "oidc_provider_arn" {
+  description = "ARN of the GitHub Actions OIDC provider"
+  value       = var.create_iam_resources ? aws_iam_openid_connect_provider.github_actions[0].arn : null
 }

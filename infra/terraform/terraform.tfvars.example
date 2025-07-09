@@ -18,7 +18,9 @@ cloudfront_price_class = "PriceClass_100"
 # IAM Configuration
 create_iam_resources = true
 frontend_deployer_username = "frontend-deployer"
-create_access_keys = false  # Set to true only for testing - use OIDC for production
+
+# OIDC Configuration (GitHub Actions Authentication)
+github_repository = "tigredonorte/thommf-portfolio"
 
 # Custom Domain Configuration (Optional)
 # Uncomment and configure these if you want to use a custom domain
