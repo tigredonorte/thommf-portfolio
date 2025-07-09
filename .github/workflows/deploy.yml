@@ -4,6 +4,20 @@ name: Deploy Portfolio to AWS
 # See .github/DEPLOYMENT.md for setup instructions.
 # These warnings are safe to ignore if you're not using GitHub Actions for deployment.
 
+# 🚀 PR DEPLOYMENT TOGGLE
+# To ENABLE PR deployments: Change DEPLOY_ON_PR to true
+# To DISABLE PR deployments: Change DEPLOY_ON_PR to false (recommended for production)
+# When enabled, PRs will deploy to the same infrastructure as main branch - USE WITH CAUTION!
+
+# 📝 HOW TO TOGGLE:
+# 1. Set DEPLOY_ON_PR to true/false below
+# 2. Commit and push the change
+# 3. The workflow will respect the new setting on the next run
+#
+# ⚠️  IMPORTANT: PR deployments use the SAME S3 bucket and CloudFront as main branch!
+# This means PR deployments will overwrite your production site temporarily.
+# Consider setting up a separate staging environment for safer PR testing.
+
 on:
   push:
     branches: [main]
@@ -14,6 +28,7 @@ on:
 env:
   AWS_REGION: us-east-1
   TERRAFORM_VERSION: 1.7.0
+  DEPLOY_ON_PR: true  # 🔧 CHANGE THIS TO false TO DISABLE PR DEPLOYMENTS
 
 permissions:
   id-token: write   # Required for OIDC
@@ -28,8 +43,14 @@ jobs:
   build-for-deploy:
     needs: ci
     runs-on: ubuntu-latest
-    if: needs.ci.result == 'success' && github.ref == 'refs/heads/main'
+    if: needs.ci.result == 'success' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
     steps:
+      - name: Check PR deployment setting
+        if: github.event_name == 'pull_request' && env.DEPLOY_ON_PR != 'true'
+        run: |
+          echo "❌ PR deployments are disabled. Set DEPLOY_ON_PR=true to enable."
+          exit 1
+      
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -99,9 +120,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build-for-deploy
-    if: github.ref == 'refs/heads/main' && needs.build-for-deploy.result == 'success'
+    if: needs.build-for-deploy.result == 'success' && (github.ref == 'refs/heads/main' || github.event_name == 'pull_request')
     environment: production
     steps:
+      - name: Check PR deployment setting
+        if: github.event_name == 'pull_request' && env.DEPLOY_ON_PR != 'true'
+        run: |
+          echo "❌ PR deployments are disabled. Set DEPLOY_ON_PR=true to enable."
+          exit 1
+      
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -158,4 +185,9 @@ jobs:
           echo "🎉 Deployment successful!"
           echo "Website URL: ${{ steps.terraform-outputs.outputs.website-url }}"
           echo "Note: CloudFront deployment can take 10-15 minutes to propagate globally."
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo ""
+            echo "⚠️  WARNING: This was a PR deployment!"
+            echo "🔧 To disable PR deployments, set DEPLOY_ON_PR=false in the workflow"
+          fi
 
