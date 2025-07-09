@@ -7,4 +7,10 @@ export default {
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx'],
   coverageDirectory: 'test-output/jest/coverage',
+  moduleNameMapper: {
+    '^headerMfe/(.*)$': '<rootDir>/src/__mocks__/headerMfe.js',
+    '^projectListMfe/(.*)$': '<rootDir>/src/__mocks__/projectListMfe.js',
+  },
+  setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
+  testEnvironment: 'jsdom',
 };

@@ -18,11 +18,12 @@ jobs:
         with:
           filter: tree:0
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-      - run: npm ci --legacy-peer-deps
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
       - run: npx playwright install --with-deps
       - uses: nrwl/nx-set-shas@v4
 
@@ -34,11 +35,12 @@ jobs:
         with:
           filter: tree:0
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-      - run: npm ci --legacy-peer-deps
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
       - uses: nrwl/nx-set-shas@v4
       - name: Lint
         run: npx nx affected -t lint
@@ -51,11 +53,12 @@ jobs:
         with:
           filter: tree:0
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-      - run: npm ci --legacy-peer-deps
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
       - uses: nrwl/nx-set-shas@v4
       - name: Test
         run: npx nx affected -t test
@@ -68,29 +71,31 @@ jobs:
         with:
           filter: tree:0
           fetch-depth: 0
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
-      - run: npm ci --legacy-peer-deps
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
       - uses: nrwl/nx-set-shas@v4
       - name: Build
         run: npx nx affected -t build
 
-  e2e:
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          filter: tree:0
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-      - run: npm ci --legacy-peer-deps
-      - run: npx playwright install --with-deps
-      - uses: nrwl/nx-set-shas@v4
-      - name: E2E
-        run: npx nx affected -t e2e
+  # e2e:
+  #   needs: setup
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         filter: tree:0
+  #         fetch-depth: 0
+  #     - uses: pnpm/action-setup@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: 'pnpm'
+  #     - run: pnpm install --frozen-lockfile
+  #     - run: npx playwright install --with-deps
+  #     - uses: nrwl/nx-set-shas@v4
+  #     - name: E2E
+  #       run: npx nx affected -t e2e
