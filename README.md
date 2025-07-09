@@ -19,6 +19,7 @@ This project is a personal portfolio website designed to showcase my skills and 
     - [End-to-End (E2E) Tests](#end-to-end-e2e-tests)
   - [Linting and Formatting](#linting-and-formatting)
   - [Deployment](#deployment)
+  - [Security & Monitoring](#security--monitoring)
   - [Technologies Used](#technologies-used)
   - [License](#license)
 
@@ -92,6 +93,60 @@ To build all applications and libraries for production:
 pnpm build
 ```
 This maps to `nx run-many --target=build --all`. The build artifacts will be located in the `dist/` directory for each project.
+
+## Deployment
+
+This project includes AWS infrastructure for deploying to S3 with CloudFront CDN.
+
+### Quick Deploy
+
+```bash
+# Configure deployment (first time only)
+cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars
+# Edit infra/terraform/terraform.tfvars with your AWS settings
+
+# Deploy everything
+pnpm run deploy
+```
+
+### Deployment Commands
+
+- **`pnpm run deploy`** - Full deployment (build + infrastructure + upload)
+- **`pnpm run deploy:build`** - Build only
+- **`pnpm run deploy:infra`** - Infrastructure only  
+- **`pnpm run deploy:upload`** - Upload files only
+
+### Infrastructure
+
+The deployment uses:
+- **S3** - Static website hosting
+- **CloudFront** - Global CDN with HTTPS
+- **Route 53** (optional) - Custom domain management
+
+For detailed deployment instructions, see [`infra/terraform/README.md`](infra/terraform/README.md).
+
+## Security & Monitoring
+
+This deployment includes enterprise-grade security measures:
+
+### 🔒 **Security Features**
+- **Least-Privilege IAM Policy** - Deployer user restricted to resources tagged with `Environment=frontend`
+- **Tag-Based Access Control** - AWS-native approach using resource tags instead of naming conventions
+- **Service Control Policies (SCP)** - Organization-level restrictions (optional)
+- **OIDC Integration** - GitHub Actions with temporary credentials (recommended)
+
+### 📊 **Monitoring & Logging**
+- **CloudTrail** - Complete API call logging and audit trail
+- **CloudWatch Alarms** - Automated alerts for security violations
+- **Security Dashboard** - Real-time monitoring of deployment activities
+- **Metric Filters** - Detection of unauthorized resource access attempts
+
+###  **Security Documentation**
+- [🔒 Security Overview](/docs/SECURITY.md) - **Comprehensive security architecture and procedures**
+- [Deployment Security Guide](/docs/DEPLOYMENT.md) - Complete setup instructions
+- [Terraform Security](/infra/terraform/README.md) - Infrastructure security details
+
+**Key Security Principle**: The deployer user can **only** manage resources tagged with `Environment=frontend`, providing complete isolation from other AWS resources while allowing flexible naming.
 
 ## Testing
 
