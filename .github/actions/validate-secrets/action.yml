@@ -1,0 +1,33 @@
+name: 'Validate Required Secrets'
+description: 'Validates that required secrets are set before deployment'
+inputs:
+  s3-bucket-name:
+    description: 'S3 bucket name secret'
+    required: true
+  s3-state-bucket-name:
+    description: 'S3 state bucket name secret'
+    required: true
+  aws-role-arn:
+    description: 'AWS role ARN secret'
+    required: true
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate required secrets
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.s3-bucket-name }}" ]; then
+          echo "❌ ERROR: S3_BUCKET_NAME secret is required but not set!"
+          echo "Please set S3_BUCKET_NAME in your GitHub repository or Production environment secrets."
+          exit 1
+        fi
+        if [ -z "${{ inputs.s3-state-bucket-name }}" ]; then
+          echo "❌ ERROR: S3_STATE_BUCKET_NAME secret is required but not set!"
+          echo "Please set S3_STATE_BUCKET_NAME in your GitHub repository or Production environment secrets."
+          exit 1
+        fi
+        if [ -z "${{ inputs.aws-role-arn }}" ]; then
+          echo "❌ ERROR: AWS_ROLE_ARN secret is required but not set!"
+          exit 1
+        fi
+        echo "✅ Required secrets validation passed"
