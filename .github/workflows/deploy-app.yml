@@ -49,18 +49,15 @@ permissions:
 jobs:
   # Deploy infrastructure first if needed (includes CI)
   infrastructure:
-    if: |
-      (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
+    # if: |
+    #   (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
     uses: ./.github/workflows/deploy-infra.yml
     secrets: inherit
 
-  # Deploy the application to S3
-  deploy:
-    needs: [infrastructure]
+  build:
     runs-on: ubuntu-latest
-    if: |
-      needs.infrastructure.result == 'success' &&
-      (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
+    # if: |
+    #   (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -75,6 +72,36 @@ jobs:
           # Build all apps that are not e2e tests (exclude projects ending with -e2e)
           npx nx run-many --target=build --all --exclude="*-e2e"
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            apps/*/dist/
+          retention-days: 1
+
+  # Deploy the application to S3
+  deploy:
+    needs: [infrastructure, build]
+    runs-on: ubuntu-latest
+    # if: |
+    #   needs.infrastructure.result == 'success' &&
+    #   (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+          path: .
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -83,8 +110,11 @@ jobs:
 
       - name: Sync files to S3
         run: |
+          # Get the bucket name from terraform output
+          BUCKET_NAME=$(cd infra/terraform && terraform output -raw s3_bucket_name)
+          
           # Sync container app files to root
-          aws s3 sync apps/container/dist/ s3://${{ vars.S3_BUCKET_NAME }}/ --delete
+          aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete
           
           # Sync all micro-frontend apps to their respective subdirectories
           for app_dir in apps/*/; do
@@ -93,7 +123,7 @@ jobs:
             if [[ "$app_name" != "container" && "$app_name" != *"-e2e" ]]; then
               if [[ -d "apps/$app_name/dist" ]]; then
                 echo "Syncing $app_name micro-frontend..."
-                aws s3 sync "apps/$app_name/dist/" "s3://${{ vars.S3_BUCKET_NAME }}/$app_name/"
+                aws s3 sync "apps/$app_name/dist/" "s3://$BUCKET_NAME/$app_name/"
               fi
             fi
           done

@@ -14,7 +14,7 @@ export function App() {
           <ProjectList />
         </main>
         <footer className="footer">
-          <p>© 2025 {config.developerName}. Built with Microfrontends.</p>
+          <p>© 2025 {config.developerName}. Built with Microfrontends! </p>
         </footer>
       </div>
     </React.Suspense>
