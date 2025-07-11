@@ -29,13 +29,13 @@ output "frontend_deployer_policy_arn" {
   value       = var.create_iam_resources ? aws_iam_policy.frontend_deployer_policy[0].arn : null
 }
 
-# # OIDC outputs
-# output "github_actions_role_arn" {
-#   description = "ARN of the GitHub Actions OIDC role"
-#   value       = var.create_iam_resources ? aws_iam_role.github_actions_role[0].arn : null
-# }
+# OIDC outputs
+output "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions OIDC role"
+  value       = var.create_iam_resources ? aws_iam_role.github_actions_role[0].arn : null
+}
 
-# output "oidc_provider_arn" {
-#   description = "ARN of the GitHub Actions OIDC provider"
-#   value       = var.create_iam_resources ? aws_iam_openid_connect_provider.github_actions[0].arn : null
-# }
+output "oidc_provider_arn" {
+  description = "ARN of the GitHub Actions OIDC provider"
+  value       = var.create_iam_resources ? aws_iam_openid_connect_provider.github_actions[0].arn : null
+}
