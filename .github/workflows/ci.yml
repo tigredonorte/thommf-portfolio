@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'apps/**'
+      - 'libs/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'nx.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/**'
   pull_request:
   workflow_call: # Allow this workflow to be called by other workflows
 
