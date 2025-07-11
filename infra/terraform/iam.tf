@@ -175,7 +175,7 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 resource "aws_iam_role" "github_actions_role" {
   count = var.create_iam_resources && var.use_oidc ? 1 : 0
 
-  name = "GitHubActionsRole"
+  name = "${var.resource_tag_environment}-GitHubActionsRole"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
