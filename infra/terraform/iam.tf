@@ -1,7 +1,4 @@
-# IAM Policy for Frontend Deployer
 resource "aws_iam_policy" "frontend_deployer_policy" {
-  count = var.create_iam_resources ? 1 : 0
-
   name        = "FrontendDeployerPolicy"
   description = "Minimal permissions for frontend deployment - restricted to Environment=frontend tagged resources"
 
