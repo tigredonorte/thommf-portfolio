@@ -8,13 +8,21 @@ on:
       - 'libs/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
-  # pull_request:
-  #   branches: [main]
-  #   paths:
-  #     - 'apps/**'
-  #     - 'libs/**'
-  #     - 'package.json'
-  #     - 'pnpm-lock.yaml'
+      - 'nx.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/**'
+      - 'infra/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - 'libs/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'nx.json'
+      - 'tsconfig*.json'
+      - '.github/workflows/**'
+      - 'infra/**'
   workflow_run:
     workflows: ["Deploy Infrastructure"]
     types: [completed]
@@ -32,7 +40,6 @@ on:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-  DEPLOY_ON_PR: ${{ vars.DEPLOY_ON_PR || 'false' }}
 
 permissions:
   id-token: write # Required for OIDC
@@ -42,6 +49,8 @@ permissions:
 jobs:
   # Deploy infrastructure first if needed (includes CI)
   infrastructure:
+    if: |
+      (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
     uses: ./.github/workflows/deploy-infra.yml
     secrets: inherit
 
@@ -49,27 +58,17 @@ jobs:
   deploy:
     needs: [infrastructure]
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'Production' }}
     if: |
-      (needs.infrastructure.result == 'success' || needs.infrastructure.result == 'skipped') &&
-      (github.ref == 'refs/heads/main' || github.event_name == 'pull_request') &&
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success')
+      needs.infrastructure.result == 'success' &&
+      (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
     steps:
-      - name: Check PR deployment setting
-        if: github.event_name == 'pull_request' && env.DEPLOY_ON_PR != 'true'
-        run: |
-          echo "❌ PR deployments are disabled. Set DEPLOY_ON_PR=true to enable."
-          exit 1
-      
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
+          fetch-depth: 0
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Build application
         run: npx nx build container

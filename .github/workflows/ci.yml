@@ -21,30 +21,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js and pnpm
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Set Nx SHAs
-        uses: nrwl/nx-set-shas@v4
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Lint affected projects
         run: npx nx affected -t lint
@@ -58,30 +35,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js and pnpm
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Set Nx SHAs
-        uses: nrwl/nx-set-shas@v4
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Test affected projects
         run: npx nx affected -t test
@@ -95,30 +49,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js and pnpm
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Set Nx SHAs
-        uses: nrwl/nx-set-shas@v4
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Build affected projects
         run: npx nx affected -t build
@@ -133,32 +64,10 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js and pnpm
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - uses: pnpm/action-setup@v4
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        shell: bash
-        run: |
-          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
-      - name: Setup pnpm cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+        uses: ./.github/actions/setup-node-pnpm
             
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
       - name: Install playwright dependencies
         run: npx playwright install --with-deps
-
-      - name: Set Nx SHAs
-        uses: nrwl/nx-set-shas@v4
         
       - name: E2E
         run: npx nx affected -t e2e
