@@ -1,0 +1,209 @@
+name: Deploy Infrastructure
+
+on:
+  workflow_call:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'Production'
+        type: choice
+        options:
+          - Production
+          - Development
+      dry_run:
+        description: 'Run terraform plan only (no apply)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TERRAFORM_VERSION: ${{ vars.TERRAFORM_VERSION || '1.7.0' }}
+  DEPLOY_ON_PR: ${{ vars.DEPLOY_ON_PR || 'false' }}
+
+permissions:
+  id-token: write   # Required for OIDC
+  contents: read    # Required for actions/checkout
+  actions: read     # Required for reusable workflows
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      infra-changed: ${{ steps.changes.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            infra:
+              - 'infra/terraform/**'
+
+  terraform-plan:
+    runs-on: ubuntu-latest
+    needs: [ci, check-changes]
+    environment: ${{ github.event.inputs.environment || 'Production' }}
+    if: |
+      needs.ci.result == 'success' &&
+      (github.ref == 'refs/heads/main' || github.event_name == 'pull_request') &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
+      (needs.check-changes.outputs.infra-changed == 'true' || github.event_name == 'workflow_dispatch')
+    steps:
+      - name: Check PR deployment setting
+        if: github.event_name == 'pull_request' && env.DEPLOY_ON_PR != 'true'
+        run: |
+          echo "❌ PR infrastructure deployments are disabled. Set DEPLOY_ON_PR=true to enable."
+          exit 1
+      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        uses: ./.github/actions/validate-secrets
+        with:
+          s3-bucket-name: ${{ vars.S3_BUCKET_NAME }}
+          s3-state-bucket-name: ${{ vars.S3_STATE_BUCKET_NAME }}
+          aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        id: init
+        working-directory: infra/terraform
+        run: |
+          ENVIRONMENT_NAME=${{ github.event.inputs.environment || 'Production' }}
+          echo "Terraform state key: portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate"
+          terraform init \
+            -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
+            -backend-config="key=portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: Terraform Format Check
+        working-directory: infra/terraform
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        working-directory: infra/terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: infra/terraform
+        run: terraform plan -out=tfplan # ✅ Generate a plan file
+        env:
+          TF_VAR_bucket_name: ${{ vars.S3_BUCKET_NAME }}
+          TF_VAR_environment: ${{ github.event.inputs.environment || 'Production' }}
+          TF_VAR_github_repository: ${{ github.repository }}
+
+      - name: Upload Terraform Plan
+        uses: actions/upload-artifact@v4 # ✅ Upload the plan file
+        with:
+          name: terraform-plan
+          path: infra/terraform/tfplan
+
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    needs: [terraform-plan, check-changes]
+    if: |
+      needs.terraform-plan.result == 'success' && 
+      (github.ref == 'refs/heads/main' || github.event_name == 'pull_request') && 
+      github.event.inputs.dry_run != 'true' &&
+      (needs.check-changes.outputs.infra-changed == 'true' || github.event_name == 'workflow_dispatch')
+    environment: ${{ github.event.inputs.environment || 'Production' }}
+    steps:
+      - name: Check PR deployment setting
+        if: github.event_name == 'pull_request' && env.DEPLOY_ON_PR != 'true'
+        run: |
+          echo "❌ PR infrastructure deployments are disabled. Set DEPLOY_ON_PR=true to enable."
+          exit 1
+      
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Download Terraform Plan
+        uses: actions/download-artifact@v4
+        with:
+          name: terraform-plan
+          path: infra/terraform
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: |
+          ENVIRONMENT_NAME=${{ github.event.inputs.environment || 'Production' }}
+          terraform init \
+            -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
+            -backend-config="key=portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+
+      - name: Terraform Apply
+        working-directory: infra/terraform
+        run: terraform apply -auto-approve tfplan # ✅ Apply the downloaded plan
+
+      - name: Display infrastructure info
+        # This step remains the same
+        working-directory: infra/terraform
+        run: |
+          echo "🏗️ Infrastructure deployment successful!"
+          echo "🌍 Environment: ${{ github.event.inputs.environment || 'Production' }}"
+          echo "S3 Bucket: $(terraform output -raw s3_bucket_name)"
+          echo "Website URL: $(terraform output -raw website_url)"
+          echo "📝 Note: Application code needs to be deployed separately."
+
+  # Summary job that always runs to provide consistent status for dependent workflows
+  infra-complete:
+    runs-on: ubuntu-latest
+    needs: [ci, check-changes, terraform-plan, deploy-infrastructure]
+    if: always()
+    outputs:
+      infra-changed: ${{ needs.check-changes.outputs.infra-changed }}
+      infra-deployed: ${{ needs.deploy-infrastructure.result == 'success' }}
+      ci-success: ${{ needs.ci.result == 'success' }}
+    steps:
+      - name: Check workflow status
+        run: |
+          echo "🔍 Workflow Summary:"
+          echo "CI Result: ${{ needs.ci.result }}"
+          echo "Infrastructure Changed: ${{ needs.check-changes.outputs.infra-changed }}"
+          echo "Terraform Plan: ${{ needs.terraform-plan.result }}"
+          echo "Infrastructure Deployment: ${{ needs.deploy-infrastructure.result }}"
+          
+          # The workflow succeeds if:
+          # - CI passed AND
+          # - Either no infra changes (skipped) OR infra was successfully deployed
+          if [[ "${{ needs.ci.result }}" == "success" ]] && \
+             ([[ "${{ needs.check-changes.outputs.infra-changed }}" == "false" ]] || \
+              [[ "${{ needs.deploy-infrastructure.result }}" == "success" ]]); then
+            echo "✅ Infrastructure workflow completed successfully"
+            exit 0
+          else
+            echo "❌ Infrastructure workflow failed"
+            exit 1
+          fi

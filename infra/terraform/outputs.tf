@@ -13,34 +13,14 @@ output "s3_website_endpoint" {
   value       = aws_s3_bucket_website_configuration.portfolio_website.website_endpoint
 }
 
-output "cloudfront_distribution_id" {
-  description = "CloudFront distribution ID"
-  value       = aws_cloudfront_distribution.portfolio_distribution.id
-}
-
-output "cloudfront_domain_name" {
-  description = "CloudFront distribution domain name"
-  value       = aws_cloudfront_distribution.portfolio_distribution.domain_name
-}
-
-output "cloudfront_hosted_zone_id" {
-  description = "CloudFront distribution hosted zone ID"
-  value       = aws_cloudfront_distribution.portfolio_distribution.hosted_zone_id
-}
-
 output "website_url" {
   description = "Website URL"
-  value       = length(var.domain_names) > 0 ? "https://${var.domain_names[0]}" : "https://${aws_cloudfront_distribution.portfolio_distribution.domain_name}"
+  value       = "http://${aws_s3_bucket_website_configuration.portfolio_website.website_endpoint}"
 }
 
 output "deployment_bucket_sync_command" {
   description = "AWS CLI command to sync your build files to S3"
   value       = "aws s3 sync apps/container/dist/ s3://${aws_s3_bucket.portfolio_bucket.bucket}/ --delete"
-}
-
-output "cloudfront_invalidation_command" {
-  description = "AWS CLI command to invalidate CloudFront cache"
-  value       = "aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.portfolio_distribution.id} --paths '/*'"
 }
 
 # IAM Policy and Role outputs
@@ -49,13 +29,13 @@ output "frontend_deployer_policy_arn" {
   value       = var.create_iam_resources ? aws_iam_policy.frontend_deployer_policy[0].arn : null
 }
 
-# OIDC outputs
-output "github_actions_role_arn" {
-  description = "ARN of the GitHub Actions OIDC role"
-  value       = var.create_iam_resources ? aws_iam_role.github_actions_role[0].arn : null
-}
+# # OIDC outputs
+# output "github_actions_role_arn" {
+#   description = "ARN of the GitHub Actions OIDC role"
+#   value       = var.create_iam_resources ? aws_iam_role.github_actions_role[0].arn : null
+# }
 
-output "oidc_provider_arn" {
-  description = "ARN of the GitHub Actions OIDC provider"
-  value       = var.create_iam_resources ? aws_iam_openid_connect_provider.github_actions[0].arn : null
-}
+# output "oidc_provider_arn" {
+#   description = "ARN of the GitHub Actions OIDC provider"
+#   value       = var.create_iam_resources ? aws_iam_openid_connect_provider.github_actions[0].arn : null
+# }
