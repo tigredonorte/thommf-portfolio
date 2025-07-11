@@ -6,6 +6,7 @@
     "setup": "./infra/scripts/setup_oidc.sh",
     "dev": "nx serve container --open --dev-remotes=headerMfe,projectListMfe",
     "build": "nx run-many --target=build --all",
+    "build:prod": "nx run-many --target=build --all --exclude=\"*-e2e\"",
     "lint": "nx run-many --target=lint --all",
     "test": "nx run-many --target=test --all",
     "e2e": "nx run-many --target=e2e --all",
@@ -15,7 +16,8 @@
     "deploy": "./infra/deploy.sh",
     "deploy:infra": "./infra/deploy.sh infrastructure-only",
     "deploy:build": "./infra/deploy.sh build-only",
-    "deploy:upload": "./infra/deploy.sh upload-only"
+    "deploy:upload": "./infra/deploy.sh upload-only",
+    "run:prod": "docker compose up --build"
   },
   "private": true,
   "dependencies": {
