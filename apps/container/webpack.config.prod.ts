@@ -8,18 +8,24 @@ import baseConfig from './module-federation.config';
 const prodConfig: ModuleFederationConfig = {
   ...baseConfig,
   /*
-   * For static deployment (S3), we'll include the remotes as part of the build
-   * so everything is bundled together as a standalone application.
-   * 
-   * If you want to deploy micro-frontends separately, you would configure
-   * the remotes to point to their deployed URLs:
-   * 
-   * remotes: [
-   *   ['headerMfe', 'https://your-header-mfe-domain.com/remoteEntry.js'],
-   *   ['projectListMfe', 'https://your-projectlist-mfe-domain.com/remoteEntry.js'],
-   * ]
+   * For static deployment on S3, we use relative URLs that will resolve
+   * to the same domain where the container app is hosted.
+   * The micro-frontends will be available at /{remoteName}/remoteEntry.js
    */
-  remotes: baseConfig.remotes,
+  remotes: baseConfig.remotes?.map((remote) => {
+    const remoteName = typeof remote === 'string' ? remote : remote[0];
+    // Use relative URLs that resolve to the current domain
+    return [remoteName, `promise new Promise((resolve, reject) => {
+      const remoteUrl = new URL('${remoteName}/remoteEntry.js', document.baseURI);
+      const script = document.createElement('script');
+      script.src = remoteUrl.href;
+      script.onload = () => {
+        resolve(window.${remoteName});
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    })`];
+  }) || [],
 };
 
 // Nx plugins for webpack to build config object from Nx options and context.
