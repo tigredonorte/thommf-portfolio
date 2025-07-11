@@ -49,8 +49,8 @@ permissions:
 jobs:
   # Deploy infrastructure first if needed (includes CI)
   infrastructure:
-    if: |
-      (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
+    # if: |
+    #   (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
     uses: ./.github/workflows/deploy-infra.yml
     secrets: inherit
 
@@ -58,9 +58,9 @@ jobs:
   deploy:
     needs: [infrastructure]
     runs-on: ubuntu-latest
-    if: |
-      needs.infrastructure.result == 'success' &&
-      (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
+    # if: |
+    #   needs.infrastructure.result == 'success' &&
+    #   (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,8 +72,8 @@ jobs:
 
       - name: Build application
         run: |
-          # Build all apps that are not e2e tests (exclude projects ending with -e2e)
-          npx nx run-many --target=build --all --exclude="*-e2e"
+          # Build all apps in production mode, excluding e2e tests
+          npx nx run-many --target=build --configuration=production --all --exclude="*-e2e"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -83,8 +83,12 @@ jobs:
 
       - name: Sync files to S3
         run: |
+          # Get the bucket name from terraform output
+          BUCKET_NAME=$(cd infra/terraform && terraform output -raw s3_bucket_name)
+          
           # Sync container app files to root
-          aws s3 sync apps/container/dist/ s3://${{ vars.S3_BUCKET_NAME }}/ --delete
+          echo "Syncing container app to root..."
+          aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete
           
           # Sync all micro-frontend apps to their respective subdirectories
           for app_dir in apps/*/; do
@@ -93,7 +97,7 @@ jobs:
             if [[ "$app_name" != "container" && "$app_name" != *"-e2e" ]]; then
               if [[ -d "apps/$app_name/dist" ]]; then
                 echo "Syncing $app_name micro-frontend..."
-                aws s3 sync "apps/$app_name/dist/" "s3://${{ vars.S3_BUCKET_NAME }}/$app_name/"
+                aws s3 sync "apps/$app_name/dist/" "s3://$BUCKET_NAME/$app_name/"
               fi
             fi
           done
@@ -101,15 +105,24 @@ jobs:
       - name: Get website URL
         id: get-url
         run: |
-          WEBSITE_ENDPOINT=$(aws s3api get-bucket-website --bucket ${{ vars.S3_BUCKET_NAME }} --query 'RoutingRules[0].Redirect.HostName' --output text 2>/dev/null || echo "")
-          if [ "$WEBSITE_ENDPOINT" = "None" ] || [ -z "$WEBSITE_ENDPOINT" ]; then
-            WEBSITE_ENDPOINT="${{ vars.S3_BUCKET_NAME }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+          # Use URL from infrastructure outputs or construct from bucket name
+          WEBSITE_URL="${{ needs.infrastructure.outputs.website-url }}"
+          if [ -z "$WEBSITE_URL" ]; then
+            BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
+            if [ -z "$BUCKET_NAME" ]; then
+              BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
+            fi
+            WEBSITE_URL="http://$BUCKET_NAME.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
           fi
-          echo "website-url=http://$WEBSITE_ENDPOINT" >> $GITHUB_OUTPUT
+          echo "website-url=$WEBSITE_URL" >> $GITHUB_OUTPUT
 
       - name: Display deployment info
         run: |
           echo "🎉 Application deployment successful!"
           echo "🌍 Environment: ${{ github.event.inputs.environment || 'Production' }}"
-          echo "📦 App files synced to S3 bucket: ${{ vars.S3_BUCKET_NAME }}"
+          BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
+          if [ -z "$BUCKET_NAME" ]; then
+            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
+          fi
+          echo "📦 App files synced to S3 bucket: $BUCKET_NAME"
           echo "🌐 Website URL: ${{ steps.get-url.outputs.website-url }}"

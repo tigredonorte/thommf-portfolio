@@ -79,10 +79,7 @@ POLICY_DOCUMENT=$(cat <<EOF
                 "s3:DeleteObject",
                 "s3:GetBucketLocation"
             ],
-            "Resource": [
-                "arn:aws:s3:::thommf-portfolio-production/*",
-                "arn:aws:s3:::thommf-portfolio-production"
-            ]
+            "Resource": "*"
         }
     ]
 }

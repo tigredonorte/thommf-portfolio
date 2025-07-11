@@ -80,7 +80,6 @@ resource_tag_environment = "frontend"
 environment = "prod"
 
 # IAM Configuration
-create_iam_resources = true
 frontend_deployer_username = "frontend-deployer"
 create_access_keys = false  # Set to true only for testing
 
@@ -157,7 +156,6 @@ aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
 | `cloudfront_price_class` | CloudFront price class | `PriceClass_100` | No |
 | `static_asset_cache_patterns` | File patterns for long-term caching | `["*.css", "*.js", "*.png", ...]` | No |
 | `github_repository` | GitHub repository for OIDC (format: owner/repo) | - | Yes |
-| `create_iam_resources` | Whether to create IAM policy and role | `true` | No |
 | `frontend_deployer_username` | Username for the deployer role | `frontend-deployer` | No |
 
 *Required if using custom domain
