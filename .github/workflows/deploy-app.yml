@@ -110,8 +110,13 @@ jobs:
 
       - name: Sync files to S3
         run: |
-          # Get the bucket name from terraform output
-          BUCKET_NAME=$(cd infra/terraform && terraform output -raw s3_bucket_name)
+          # Get the bucket name from infrastructure job outputs or fallback to variable
+          BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
+          if [ -z "$BUCKET_NAME" ]; then
+            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
+          fi
+          
+          echo "📦 Using S3 bucket: $BUCKET_NAME"
           
           # Sync container app files to root
           aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete
@@ -131,15 +136,24 @@ jobs:
       - name: Get website URL
         id: get-url
         run: |
-          WEBSITE_ENDPOINT=$(aws s3api get-bucket-website --bucket ${{ vars.S3_BUCKET_NAME }} --query 'RoutingRules[0].Redirect.HostName' --output text 2>/dev/null || echo "")
-          if [ "$WEBSITE_ENDPOINT" = "None" ] || [ -z "$WEBSITE_ENDPOINT" ]; then
-            WEBSITE_ENDPOINT="${{ vars.S3_BUCKET_NAME }}.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+          # Use URL from infrastructure outputs or construct from bucket name
+          WEBSITE_URL="${{ needs.infrastructure.outputs.website-url }}"
+          if [ -z "$WEBSITE_URL" ]; then
+            BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
+            if [ -z "$BUCKET_NAME" ]; then
+              BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
+            fi
+            WEBSITE_URL="http://$BUCKET_NAME.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
           fi
-          echo "website-url=http://$WEBSITE_ENDPOINT" >> $GITHUB_OUTPUT
+          echo "website-url=$WEBSITE_URL" >> $GITHUB_OUTPUT
 
       - name: Display deployment info
         run: |
           echo "🎉 Application deployment successful!"
           echo "🌍 Environment: ${{ github.event.inputs.environment || 'Production' }}"
-          echo "📦 App files synced to S3 bucket: ${{ vars.S3_BUCKET_NAME }}"
+          BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
+          if [ -z "$BUCKET_NAME" ]; then
+            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
+          fi
+          echo "📦 App files synced to S3 bucket: $BUCKET_NAME"
           echo "🌐 Website URL: ${{ steps.get-url.outputs.website-url }}"

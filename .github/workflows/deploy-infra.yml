@@ -2,6 +2,19 @@ name: Deploy Infrastructure
 
 on:
   workflow_call:
+    outputs:
+      s3-bucket-name:
+        description: "The S3 bucket name for the deployed infrastructure"
+        value: ${{ jobs.infra-complete.outputs.s3-bucket-name }}
+      website-url:
+        description: "The website URL for the deployed infrastructure"
+        value: ${{ jobs.infra-complete.outputs.website-url }}
+      infra-changed:
+        description: "Whether infrastructure was changed"
+        value: ${{ jobs.infra-complete.outputs.infra-changed }}
+      infra-deployed:
+        description: "Whether infrastructure was successfully deployed"
+        value: ${{ jobs.infra-complete.outputs.infra-deployed }}
   workflow_dispatch:
     inputs:
       environment:
@@ -188,7 +201,47 @@ jobs:
       infra-changed: ${{ needs.check-changes.outputs.infra-changed }}
       infra-deployed: ${{ needs.deploy-infrastructure.result == 'success' }}
       ci-success: ${{ needs.ci.result == 'success' }}
+      s3-bucket-name: ${{ steps.get-outputs.outputs.s3-bucket-name }}
+      website-url: ${{ steps.get-outputs.outputs.website-url }}
     steps:
+      - name: Checkout code
+        if: needs.deploy-infrastructure.result == 'success'
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        if: needs.deploy-infrastructure.result == 'success'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: Configure AWS credentials
+        if: needs.deploy-infrastructure.result == 'success'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init and Get Outputs
+        if: needs.deploy-infrastructure.result == 'success'
+        id: get-outputs
+        working-directory: infra/terraform
+        run: |
+          ENVIRONMENT_NAME=${{ github.event.inputs.environment || 'Production' }}
+          terraform init \
+            -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
+            -backend-config="key=portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate" \
+            -backend-config="region=${{ env.AWS_REGION }}"
+          
+          S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+          WEBSITE_URL=$(terraform output -raw website_url)
+          
+          echo "s3-bucket-name=$S3_BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "website-url=$WEBSITE_URL" >> $GITHUB_OUTPUT
+          
+          echo "📦 S3 Bucket: $S3_BUCKET_NAME"
+          echo "🌐 Website URL: $WEBSITE_URL"
+
       - name: Check workflow status
         run: |
           echo "🔍 Workflow Summary:"
