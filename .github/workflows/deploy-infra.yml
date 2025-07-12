@@ -60,6 +60,7 @@ jobs:
           filters: |
             infra:
               - 'infra/terraform/**'
+              - '.github/workflows/deploy-infra.yml'
 
   terraform-plan:
     runs-on: ubuntu-latest

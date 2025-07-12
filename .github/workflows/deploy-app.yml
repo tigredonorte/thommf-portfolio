@@ -54,35 +54,9 @@ jobs:
     uses: ./.github/workflows/deploy-infra.yml
     secrets: inherit
 
-  build:
-    runs-on: ubuntu-latest
-    # if: |
-    #   (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
-
-      - name: Build application
-        run: |
-          # Build all apps that are not e2e tests (exclude projects ending with -e2e)
-          npx nx run-many --target=build --all --exclude="*-e2e"
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-artifacts
-          path: |
-            apps/*/dist/
-          retention-days: 1
-
   # Deploy the application to S3
   deploy:
-    needs: [infrastructure, build]
+    needs: [infrastructure]
     runs-on: ubuntu-latest
     # if: |
     #   needs.infrastructure.result == 'success' &&
@@ -96,11 +70,10 @@ jobs:
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-artifacts
-          path: .
+      - name: Build application
+        run: |
+          # Build all apps in production mode, excluding e2e tests
+          npx nx run-many --target=build --configuration=production --all --exclude="*-e2e"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -119,6 +92,7 @@ jobs:
           echo "📦 Using S3 bucket: $BUCKET_NAME"
           
           # Sync container app files to root
+          echo "Syncing container app to root..."
           aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete
           
           # Sync all micro-frontend apps to their respective subdirectories
