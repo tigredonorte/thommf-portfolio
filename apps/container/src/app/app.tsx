@@ -1,9 +1,9 @@
 import { config } from '@thommf-portfolio/config';
 import * as React from 'react';
+import { AppRouter } from './AppRouter';
 import './app.scss';
 
 const Header = React.lazy(() => import('headerMfe/Module'));
-const ProjectList = React.lazy(() => import('projectListMfe/Module'));
 
 export function App() {
   return (
@@ -11,7 +11,7 @@ export function App() {
       <div className="app-layout">
         <Header />
         <main className="main-content">
-          <ProjectList />
+          <AppRouter />
         </main>
         <footer className="footer">
           <p>© 2025 {config.developerName}. Built with Microfrontends </p>
