@@ -132,7 +132,11 @@ resource "aws_iam_policy" "frontend_deployer_policy" {
         Action = [
           "acm:ListCertificates",
           "acm:DescribeCertificate",
-          "acm:ListTagsForCertificate"
+          "acm:ListTagsForCertificate",
+          "acm:RequestCertificate",
+          "acm:DeleteCertificate",
+          "acm:AddTagsToCertificate",
+          "acm:RemoveTagsFromCertificate"
         ]
         Resource = "*"
       }
