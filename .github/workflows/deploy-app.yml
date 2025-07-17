@@ -49,8 +49,8 @@ permissions:
 jobs:
   # Deploy infrastructure first if needed (includes CI)
   infrastructure:
-    # if: |
-    #   (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
+    if: |
+      (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
     uses: ./.github/workflows/deploy-infra.yml
     secrets: inherit
 
@@ -58,9 +58,9 @@ jobs:
   deploy:
     needs: [infrastructure]
     runs-on: ubuntu-latest
-    # if: |
-    #   needs.infrastructure.result == 'success' &&
-    #   (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
+    if: |
+      needs.infrastructure.result == 'success' &&
+      (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
