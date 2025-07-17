@@ -1,14 +1,12 @@
 variable "aws_region" {
-  description = "AWS region for all resources"
+  description = "AWS region for resources (S3, CloudFront, etc.)"
   type        = string
   default     = "us-east-1"
 }
 
 variable "bucket_name" {
-  description = "Name of the S3 bucket for hosting the website"
+  description = "Name of the S3 bucket for hosting the static website (must be globally unique)"
   type        = string
-  # Note: S3 bucket names must be globally unique
-  # You should override this in terraform.tfvars
 }
 
 variable "environment" {
@@ -33,6 +31,7 @@ variable "tags" {
   default     = {}
 }
 
+# IAM & GitHub OIDC
 variable "frontend_deployer_username" {
   description = "Username for the frontend deployer role"
   type        = string
@@ -57,5 +56,24 @@ variable "github_repository" {
   validation {
     condition     = can(regex("^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$", var.github_repository))
     error_message = "github_repository must be in the format 'owner/repo' (e.g., 'username/my-repo')."
+  }
+}
+
+# Domain configuration
+variable "domain_name" {
+  description = "The primary domain name (e.g., thomfilg.com)"
+  type        = string
+}
+
+variable "subdomain_names" {
+  description = "List of subdomains to include in the SSL certificate and CloudFront aliases"
+  type        = list(string)
+  default     = ["www.thomfilg.com"]
+
+  validation {
+    condition = alltrue([
+      for domain in var.subdomain_names : can(regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", domain))
+    ])
+    error_message = "All subdomain names must be valid domain names."
   }
 }
