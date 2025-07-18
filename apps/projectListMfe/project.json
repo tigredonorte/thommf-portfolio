@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/projectListMfe/src",
   "projectType": "application",
-  "tags": [],
+  "tags": ["mfe", "projectList", "app"],
   "targets": {
     "build": {
       "executor": "@nx/webpack:webpack",
@@ -50,7 +50,8 @@
       "options": {
         "buildTarget": "projectListMfe:build",
         "hmr": true,
-        "port": 4202
+        "port": 4202,
+        "allowedHosts": "all"
       },
       "configurations": {
         "development": {
@@ -65,17 +66,9 @@
     },
     "serve-static": {
       "executor": "@nx/react:module-federation-static-server",
-      "defaultConfiguration": "production",
       "options": {
-        "serveTarget": "projectListMfe:serve"
-      },
-      "configurations": {
-        "development": {
-          "serveTarget": "projectListMfe:serve:development"
-        },
-        "production": {
-          "serveTarget": "projectListMfe:serve:production"
-        }
+        "serveTarget": "projectListMfe:serve:production",
+        "staticFilePath": "apps/projectListMfe/dist"
       }
     }
   }
