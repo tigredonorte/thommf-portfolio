@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/container/src",
   "projectType": "application",
-  "tags": [],
+  "tags": ["mfe", "container", "app", "main"],
   "targets": {
     "build": {
       "executor": "@nx/webpack:webpack",
@@ -49,7 +49,8 @@
       "options": {
         "buildTarget": "container:build",
         "hmr": true,
-        "port": 4200
+        "port": 4200,
+        "allowedHosts": "all"
       },
       "configurations": {
         "development": {
@@ -64,17 +65,9 @@
     },
     "serve-static": {
       "executor": "@nx/react:module-federation-static-server",
-      "defaultConfiguration": "production",
       "options": {
-        "serveTarget": "container:serve"
-      },
-      "configurations": {
-        "development": {
-          "serveTarget": "container:serve:development"
-        },
-        "production": {
-          "serveTarget": "container:serve:production"
-        }
+        "serveTarget": "container:serve:production",
+        "staticFilePath": "apps/container/dist"
       }
     }
   }
