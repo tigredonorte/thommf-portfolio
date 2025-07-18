@@ -3,7 +3,8 @@
   "compilerOptions": {
     "allowJs": true,
     "outDir": "out-tsc/playwright",
-    "sourceMap": false
+    "sourceMap": false,
+    "rootDir": "../../"
   },
   "include": [
     "**/*.ts",
@@ -13,7 +14,8 @@
     "src/**/*.spec.js",
     "src/**/*.test.ts",
     "src/**/*.test.js",
-    "src/**/*.d.ts"
+    "src/**/*.d.ts",
+    "./../../e2e-utils/**/*.ts"
   ],
   "exclude": [
     "out-tsc",
