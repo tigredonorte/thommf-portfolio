@@ -38,6 +38,7 @@
           "namedChunks": false,
           "extractLicenses": true,
           "vendorChunk": false,
+          "baseHref": "/projectListMfe/",
           "webpackConfig": "apps/projectListMfe/webpack.config.prod.ts"
         }
       },
