@@ -1,0 +1,57 @@
+name: thommf-portfolio-e2e
+
+services:
+  frontend-static:
+    build:
+      context: ../../
+      dockerfile: infra/e2e/Dockerfile.frontend-static
+    ports:
+      - "80:80"
+    container_name: frontend-static
+    restart: unless-stopped
+    healthcheck:
+      test: [
+        "CMD-SHELL", 
+        "(curl --silent --fail http://localhost/health | grep -q 'healthy') || exit 1"
+      ]
+      interval: 180s
+      timeout: 10s
+      retries: 20
+      start_period: 10s
+      start_interval: 10s
+    labels:
+      - "traefik.enable=false"
+      - "description=Production test environment for micro-frontend portfolio"
+    environment:
+      - NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx/conf.d
+      - CI=true
+    networks:
+      - e2e-network
+
+  e2e-tests:
+    container_name: e2e
+    build:
+      context: ../../
+      dockerfile: infra/e2e/Dockerfile.e2e
+    depends_on:
+      frontend-static:
+        condition: service_healthy
+    volumes:
+      - ../../:/workspace
+      - /workspace/node_modules
+    working_dir: /workspace
+    environment:
+      - CI=true
+      - APP_URL=http://frontend-static # TODO: use env variable for app URL
+      - DISPLAY=${DISPLAY}
+    ipc: host
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - seccomp:unconfined
+    networks:
+      - e2e-network
+
+networks:
+  e2e-network:
+    driver: bridge
