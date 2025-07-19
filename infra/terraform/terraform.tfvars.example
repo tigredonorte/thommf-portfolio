@@ -12,21 +12,27 @@ environment = "prod"
 # Resource Tagging - MUST be 'frontend' for IAM policy compliance
 resource_tag_environment = "frontend"
 
-# CloudFront Configuration
-cloudfront_price_class = "PriceClass_100"
-
 # IAM Configuration
 create_iam_resources = true
 frontend_deployer_username = "frontend-deployer"
 
 # OIDC Configuration (GitHub Actions Authentication)
+use_oidc = true
 github_repository = "tigredonorte/thommf-portfolio"
 
-# Custom Domain Configuration (Optional)
-# Uncomment and configure these if you want to use a custom domain
-# domain_names = ["yourdomain.com", "www.yourdomain.com"]
-# ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
-# hosted_zone_id = "Z123456789012345678901"
+# Domain configuration for SSL and CloudFront
+domain_name                     = "thomfilg.com"
+subdomain_names                 = ["www.thomfilg.com"]
+create_ssl_certificate          = true
+create_cloudfront_distribution  = true
+create_route53_records          = false
+hosted_zone_id                  = "" # Leave empty to auto-discover, or specify if you know it
+
+# Optional: Additional tags
+tags = {
+  ManagedBy = "terraform"
+  Owner     = "your-name"
+}
 
 # Additional Tags
 tags = {

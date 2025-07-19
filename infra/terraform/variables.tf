@@ -59,3 +59,47 @@ variable "github_repository" {
     error_message = "github_repository must be in the format 'owner/repo' (e.g., 'username/my-repo')."
   }
 }
+
+# Domain configuration variables
+variable "domain_name" {
+  description = "The primary domain name (e.g., thomfilg.com)"
+  type        = string
+  default     = "thomfilg.com"
+}
+
+variable "subdomain_names" {
+  description = "List of subdomains to include in the SSL certificate and CloudFront aliases"
+  type        = list(string)
+  default     = ["www.thomfilg.com"]
+
+  validation {
+    condition = alltrue([
+      for domain in var.subdomain_names : can(regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", domain))
+    ])
+    error_message = "All subdomain names must be valid domain names."
+  }
+}
+
+variable "create_ssl_certificate" {
+  description = "Whether to create an SSL certificate in ACM"
+  type        = bool
+  default     = true
+}
+
+variable "create_cloudfront_distribution" {
+  description = "Whether to create a CloudFront distribution"
+  type        = bool
+  default     = true
+}
+
+variable "create_route53_records" {
+  description = "Whether to create Route 53 DNS records"
+  type        = bool
+  default     = false
+}
+
+variable "hosted_zone_id" {
+  description = "Route 53 hosted zone ID for the domain (if not provided, will be looked up)"
+  type        = string
+  default     = ""
+}
