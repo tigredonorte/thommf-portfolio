@@ -42,7 +42,7 @@ services:
     working_dir: /workspace
     environment:
       - CI=true
-      - APP_URL=http://frontend-static # TODO: use env variable for app URL
+      - APP_URL=${APP_URL:-http://frontend-static}
       - DISPLAY=${DISPLAY}
     ipc: host
     cap_add:

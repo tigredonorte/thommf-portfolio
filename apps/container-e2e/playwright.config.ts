@@ -16,7 +16,7 @@ const baseURL = getProjectUrl('container');
  */
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */  fullyParallel: true,
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   timeout: 5000,
   reporter: 'html',

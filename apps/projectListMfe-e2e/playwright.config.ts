@@ -15,14 +15,12 @@ const baseURL = getProjectUrl('projectListMfe');
  */
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
-  /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
 
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   timeout: 5000,
   reporter: 'html',
   workers: process.env.CI ? 1 : undefined,
-
   use: {
     baseURL,
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */

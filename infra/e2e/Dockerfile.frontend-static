@@ -15,7 +15,7 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-RUN npx nx reset && npx nx run-many --target=build --all --exclude="*-e2e"
+RUN npx nx run-many --target=build --all --exclude="*-e2e"
 
 # 3. Production stage with Nginx
 FROM base AS final
