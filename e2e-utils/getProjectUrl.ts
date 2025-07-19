@@ -5,6 +5,18 @@ import * as fs from 'fs';
 export const getProjectUrl = (projectName: string, envUrl: string | undefined = process.env['APP_URL']) => {
   const baseUrl = envUrl || 'http://localhost';
 
+  if (!projectName) {
+    console.error('Project name is required to get the project URL');
+    throw new Error('Project name is required to get the project URL');
+  }
+
+  if (process.env['CI'] === 'true') {
+    if (projectName.includes('container')) {
+      return baseUrl;
+    }
+    return `${baseUrl}/${projectName}/`;
+  }
+
   try {
     const projectJsonPath = path.join(workspaceRoot, `apps/${projectName}/project.json`);
     const projectJson = JSON.parse(fs.readFileSync(projectJsonPath, 'utf-8'));
