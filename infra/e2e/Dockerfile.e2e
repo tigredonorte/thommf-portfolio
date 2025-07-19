@@ -1,0 +1,18 @@
+FROM mcr.microsoft.com/playwright:v1.53.2-jammy AS playwright-base
+
+WORKDIR /workspace
+
+RUN git config --global --add safe.directory /workspace && \
+    git config --global user.email 'e2e@test.com' && \
+    git config --global user.name 'E2E Test' && \
+    npm install -g pnpm
+
+COPY package.json pnpm-lock.yaml ./
+
+RUN pnpm install --frozen-lockfile
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+COPY . .
+
+CMD ["sh", "-c", "npx wait-on http://frontend-static && pnpm test:e2e"]
