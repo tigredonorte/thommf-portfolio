@@ -8,7 +8,7 @@ export function AppRouter() {
     <Routes>
       <Route path="/" element={<ProjectList />} />
       
-      {/* @TODO: Create actually a page and return proper status */}
+      {/* @TODO: Create actually a page for 404 and return proper status */}
       <Route path="*" element={<div>404 Not Found</div>} />
     </Routes>
   );

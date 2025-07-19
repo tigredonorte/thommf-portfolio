@@ -53,7 +53,6 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    if: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,9 +61,6 @@ jobs:
 
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
-            
-      - name: Install playwright dependencies
-        run: npx playwright install --with-deps
 
       - name: Enable Docker BuildKit
         run: |
