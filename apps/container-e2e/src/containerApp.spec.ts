@@ -1,8 +1,14 @@
 import { test, expect } from '@playwright/test';
 
+test('Correct Mfe page', async ({ page }) => {
+  await page.goto('./');
+
+  await expect(page).toHaveTitle('Container');
+});
+
 test('root page renders correctly', async ({ page }) => {
-  await page.goto('/');
-  
+  await page.goto('./');
+
   // Expect h1 to contain a substring.
   expect(await page.locator('h1').innerText()).toContain('Thompson Filgueiras');
   
@@ -12,22 +18,11 @@ test('root page renders correctly', async ({ page }) => {
 });
 
 test('displays 404 for invalid routes', async ({ page }) => {
-  await page.goto('/asdfasdf');
+  const response = await page.goto('./asdfasdf');
 
   await expect(page.locator('body')).toContainText('404');
-  
-  const response = await page.goto('/asdfasdf');
 
   // @TODO: use 404 instead of 200
   expect(response?.status()).toBe(200);
-});
-
-test('health endpoint returns healthy', async ({ page }) => {
-  const response = await page.goto('/health');
-
-  // Expect the health check to return "healthy"
-  await expect(page.locator('body')).toContainText('Healthy');
-  
-  // Verify successful response
-  expect(response?.status()).toBe(200);
+  expect(await page.locator('main div').innerText()).toContain('404 Not Found');
 });
