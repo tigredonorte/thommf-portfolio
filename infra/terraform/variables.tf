@@ -1,14 +1,12 @@
 variable "aws_region" {
-  description = "AWS region for all resources"
+  description = "AWS region for resources (S3, CloudFront, etc.)"
   type        = string
   default     = "us-east-1"
 }
 
 variable "bucket_name" {
-  description = "Name of the S3 bucket for hosting the website"
+  description = "Name of the S3 bucket for hosting the static website (must be globally unique)"
   type        = string
-  # Note: S3 bucket names must be globally unique
-  # You should override this in terraform.tfvars
 }
 
 variable "environment" {
@@ -33,6 +31,7 @@ variable "tags" {
   default     = {}
 }
 
+# IAM & GitHub OIDC
 variable "frontend_deployer_username" {
   description = "Username for the frontend deployer role"
   type        = string
@@ -60,11 +59,10 @@ variable "github_repository" {
   }
 }
 
-# Domain configuration variables
+# Domain configuration
 variable "domain_name" {
   description = "The primary domain name (e.g., thomfilg.com)"
   type        = string
-  default     = "thomfilg.com"
 }
 
 variable "subdomain_names" {
@@ -78,28 +76,4 @@ variable "subdomain_names" {
     ])
     error_message = "All subdomain names must be valid domain names."
   }
-}
-
-variable "create_ssl_certificate" {
-  description = "Whether to create an SSL certificate in ACM"
-  type        = bool
-  default     = true
-}
-
-variable "create_cloudfront_distribution" {
-  description = "Whether to create a CloudFront distribution"
-  type        = bool
-  default     = true
-}
-
-variable "create_route53_records" {
-  description = "Whether to create Route 53 DNS records"
-  type        = bool
-  default     = false
-}
-
-variable "hosted_zone_id" {
-  description = "Route 53 hosted zone ID for the domain (if not provided, will be looked up)"
-  type        = string
-  default     = ""
 }
