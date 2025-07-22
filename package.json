@@ -19,7 +19,10 @@
     "deploy:infra": "./infra/deploy.sh infrastructure-only",
     "deploy:build": "./infra/deploy.sh build-only",
     "deploy:upload": "./infra/deploy.sh upload-only",
-    "run:prod": "docker compose up --build"
+    "run:prod": "docker compose up --build",
+    "tf:init": "terraform -chdir=infra/terraform init -upgrade",
+    "tf:plan": "terraform -chdir=infra/terraform plan -refresh=true -input=false -out=tfplan",
+    "tf:apply": "terraform -chdir=infra/terraform apply -input=false tfplan"
   },
   "private": true,
   "dependencies": {
