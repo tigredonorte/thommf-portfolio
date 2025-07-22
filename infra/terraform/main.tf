@@ -25,8 +25,12 @@ provider "aws" {
 # Local values for subdomains
 # ----------------------------
 locals {
-  env_subdomain  = format("%s.%s", var.environment, var.domain_name)
-  all_subdomains = concat(var.subdomain_names, [local.env_subdomain])
+  # Conditionally create the environment-specific subdomain.
+  # If environment is 'prod', this list is empty. Otherwise, it creates e.g., 'dev.thomfilg.com'.
+  env_specific_subdomain = var.environment == "prod" ? [] : [format("%s.%s", var.environment, var.domain_name)]
+
+  # Combine the default subdomains (like 'www') with the environment-specific one (if any).
+  all_subdomains = concat(var.subdomain_names, local.env_specific_subdomain)
 }
 
 # ============================
