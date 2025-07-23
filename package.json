@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "setup": "./infra/scripts/setup_oidc.sh",
-    "dev": "nx serve container --open",
+    "dev": "nx run-many --target=serve --projects=container,headerMfe,projectListMfe",
     "build": "nx run-many --target=build --all",
     "build:prod": "nx run-many --target=build --all --exclude=\"*-e2e\"",
     "lint": "nx run-many --target=lint --all",
@@ -20,8 +20,8 @@
     "deploy:build": "./infra/deploy.sh build-only",
     "deploy:upload": "./infra/deploy.sh upload-only",
     "run:prod": "docker compose up --build",
-    "tf:init": "terraform -chdir=infra/terraform init -upgrade",
-    "tf:plan": "terraform -chdir=infra/terraform plan -refresh=true -input=false -out=tfplan",
+    "tf:init": "terraform -chdir=infra/terraform init -upgrade -reconfigure -backend-config=backend-${TF_ENV:-local}.hcl",
+    "tf:plan": "terraform -chdir=infra/terraform plan -refresh=true -input=false -out=tfplan -var-file=terraform-${TF_ENV:-local}.tfvars",
     "tf:apply": "terraform -chdir=infra/terraform apply -input=false tfplan"
   },
   "private": true,
