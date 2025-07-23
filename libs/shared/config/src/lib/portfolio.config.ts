@@ -76,8 +76,7 @@ export const config: PortfolioConfig = {
           title: 'Spreadsheet-Based SERP Data Automation',
           description: 'Initiated the product research automation process by integrating Google Spreadsheets with company APIs via Google AppScript to retrieve SERP data. This first phase reduced initial research time from 50 to 30 minutes and included a migration script for seamless updates.',
           tech: ['Google Sheets', 'Google AppScript', 'Automation'],
-          images: [
-            '/assets/images/clickpart/spreadsheets-1.png'],
+          images: [],
           isOnline: true,
           industry: 'MarTech & Automation',
         },

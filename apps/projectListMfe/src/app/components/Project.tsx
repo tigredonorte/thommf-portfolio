@@ -3,6 +3,7 @@ import { Carousel } from "react-responsive-carousel";
 import { LazyLoadImage } from "react-lazy-load-image-component";
 import { IProject } from "@thommf-portfolio/config";
 import Lightbox from "yet-another-react-lightbox";
+import classNames from "classnames";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
 import "yet-another-react-lightbox/styles.css";
 import "./Project.scss";
@@ -27,8 +28,7 @@ export const Project = ({ project }: ProjectProps) => {
   return (
     <>
       <div className={`project-card ${hasImages ? '' : 'no-image'}`}>
-        {hasImages ? (
-          <>
+        {hasImages && (
             <div className="project-carousel">
               <Carousel
                 showThumbs={false}
@@ -53,29 +53,17 @@ export const Project = ({ project }: ProjectProps) => {
                 ))}
               </Carousel>
             </div>
-            <div className="project-details">
-              <h5>{project.title}</h5>
-              <span className="industry-tag">{project.industry}</span>
-              <p>{project.description}</p>
-              <div className="tech-list">
-                {project.tech.map((t) => (
-                  <span key={t}>{t}</span>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="project-details full-width">
-            <h5>{project.title}</h5>
-            <span className="industry-tag">{project.industry}</span>
-            <p>{project.description}</p>
-            <div className="tech-list">
-              {project.tech.map((t) => (
-                <span key={t}>{t}</span>
-              ))}
-            </div>
-          </div>
         )}
+        <div className={classNames("project-details", { "full-width": project.images.length === 1 })}>
+          <h5>{project.title}</h5>
+          <span className="industry-tag">{project.industry}</span>
+          <p>{project.description}</p>
+          <div className="tech-list">
+            {project.tech.map((t) => (
+              <span key={t}>{t}</span>
+            ))}
+          </div>
+        </div>
       </div>
 
       {hasImages && (
