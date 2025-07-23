@@ -27,12 +27,12 @@ output "deployment_bucket_sync_command" {
 # SSL Certificate Outputs
 output "ssl_certificate_arn" {
   description = "ARN of the SSL certificate"
-  value       = aws_acm_certificate.portfolio_cert.arn
+  value       = local.acm_certificate_arn
 }
 
 output "ssl_certificate_status" {
   description = "Status of the SSL certificate"
-  value       = aws_acm_certificate.portfolio_cert.status
+  value       = var.create_shared_resources ? aws_acm_certificate.portfolio_cert[0].status : data.aws_acm_certificate.portfolio_cert[0].status
 }
 
 # CloudFront Outputs
@@ -59,12 +59,12 @@ output "cloudfront_hosted_zone_id" {
 # Route 53 Outputs
 output "route53_zone_id" {
   description = "Route 53 hosted zone ID"
-  value       = aws_route53_zone.main.zone_id
+  value       = local.route53_zone_id
 }
 
 output "route53_name_servers" {
   description = "Name servers for the Route 53 hosted zone"
-  value       = aws_route53_zone.main.name_servers
+  value       = var.create_shared_resources ? aws_route53_zone.main[0].name_servers : data.aws_route53_zone.main[0].name_servers
 }
 
 output "domain_name" {

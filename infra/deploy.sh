@@ -147,14 +147,49 @@ upload_files() {
         print_error "Could not get S3 bucket name from Terraform output"
         exit 1
     fi
+
+    if [ -z "$CLOUDFRONT_ID" ]; then
+        print_error "Could not get CloudFront ID from Terraform output"
+        exit 1
+    fi
+
+    cd "$PROJECT_ROOT"
     
     # Sync files to S3
     aws s3 sync "$BUILD_DIR/" "s3://$BUCKET_NAME/" --delete
     
     print_success "Files uploaded to S3"
     
+     # Sync all micro-frontend apps to their respective subdirectories
+    print_step "Syncing micro-frontend apps to their respective subdirectories..."
+
+    for app_dir in apps/*/; do
+        app_name=$(basename "$app_dir")
+        if [[ "$app_name" != "container" && "$app_name" != *"-e2e" ]]; then
+            print_step "Syncing $app_name micro-frontend..."
+            if [[ -d "apps/$app_name/dist" ]]; then
+                print_step "Syncing $app_name micro-frontend from apps/$app_name/dist"
+                aws s3 sync "apps/$app_name/dist/" "s3://$BUCKET_NAME/$app_name/" --delete 2>&1 | tee -a deploy.log  || {
+                    print_error "Failed to sync $app_name micro-frontend. Check deploy.log for details."
+                    exit 1
+                }
+            else
+                print_error "Directory apps/$app_name/dist/ does not exist"
+                echo "Skipping $app_name due to missing dist directory"
+                continue
+            fi
+        else
+            echo "Skipping $app_name"
+            continue
+        fi
+    done
+
     # Invalidate CloudFront cache
-    print_step "Invalidating CloudFront cache..."
+    if [ -z "$CLOUDFRONT_ID" ]; then
+        print_error "Could not get CloudFront ID from Terraform output, skipping invalidation"
+        exit 1
+    fi
+     print_step "Invalidating CloudFront cache..."
     aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_ID" --paths "/*"
     
     print_success "CloudFront cache invalidated"

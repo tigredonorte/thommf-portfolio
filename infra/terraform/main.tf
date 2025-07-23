@@ -75,63 +75,7 @@ resource "aws_s3_bucket_public_access_block" "portfolio_public_access_block" {
   restrict_public_buckets = true
 }
 
-# ============================
-# Route 53 Hosted Zone
-# ============================
-resource "aws_route53_zone" "main" {
-  name = var.domain_name
-
-  tags = {
-    Name        = "Portfolio Hosted Zone"
-    Environment = var.resource_tag_environment
-    Project     = "thommf-portfolio"
-  }
-}
-
-# ===================================
-# SSL Certificate (must be in us-east-1 for CloudFront)
-# ===================================
-resource "aws_acm_certificate" "portfolio_cert" {
-  provider                  = aws.us_east_1
-  domain_name               = var.domain_name
-  subject_alternative_names = local.all_subdomains
-  validation_method         = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-
-  tags = {
-    Name        = "Portfolio SSL Certificate"
-    Environment = var.resource_tag_environment
-    Project     = "thommf-portfolio"
-  }
-}
-
-# ============================
-# DNS records for ACM validation
-# ============================
-resource "aws_route53_record" "cert_validation" {
-  for_each = {
-    for dvo in aws_acm_certificate.portfolio_cert.domain_validation_options : dvo.domain_name => dvo
-  }
-
-  zone_id = aws_route53_zone.main.zone_id
-  name    = each.value.resource_record_name
-  type    = each.value.resource_record_type
-  records = [each.value.resource_record_value]
-  ttl     = 60
-}
-
-resource "aws_acm_certificate_validation" "portfolio_cert_validation" {
-  provider                = aws.us_east_1
-  certificate_arn         = aws_acm_certificate.portfolio_cert.arn
-  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
-
-  timeouts {
-    create = "30m" # Increased timeout
-  }
-}
+# Route53 Zone and SSL Certificate are managed in data.tf
 
 # ============================
 # CloudFront Origin Access Control
@@ -148,8 +92,6 @@ resource "aws_cloudfront_origin_access_control" "portfolio_oac" {
 # CloudFront Distribution
 # ============================
 resource "aws_cloudfront_distribution" "portfolio_distribution" {
-  depends_on = [aws_acm_certificate_validation.portfolio_cert_validation]
-
   origin {
     domain_name              = aws_s3_bucket.portfolio_bucket.bucket_regional_domain_name
     origin_access_control_id = aws_cloudfront_origin_access_control.portfolio_oac.id
@@ -204,7 +146,7 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
   }
 
   viewer_certificate {
-    acm_certificate_arn            = aws_acm_certificate.portfolio_cert.arn
+    acm_certificate_arn            = local.acm_certificate_arn
     ssl_support_method             = "sni-only"
     minimum_protocol_version       = "TLSv1.2_2021"
     cloudfront_default_certificate = false
@@ -248,7 +190,7 @@ resource "aws_s3_bucket_policy" "portfolio_bucket_policy_cloudfront" {
 # DNS Records (Root + Subdomains)
 # ============================
 resource "aws_route53_record" "portfolio_apex" {
-  zone_id = aws_route53_zone.main.zone_id
+  zone_id = local.route53_zone_id
   name    = var.domain_name
   type    = "A"
 
@@ -262,7 +204,7 @@ resource "aws_route53_record" "portfolio_apex" {
 resource "aws_route53_record" "portfolio_subdomains" {
   for_each = toset(local.all_subdomains)
 
-  zone_id = aws_route53_zone.main.zone_id
+  zone_id = local.route53_zone_id
   name    = each.key
   type    = "A"
 

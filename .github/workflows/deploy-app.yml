@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'infra/**'
       - 'apps/**'
       - 'libs/**'
       - 'package.json'
@@ -15,6 +16,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - 'infra/**'
       - 'apps/**'
       - 'libs/**'
       - 'package.json'
