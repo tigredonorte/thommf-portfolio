@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "setup": "./infra/scripts/setup_oidc.sh",
-    "dev": "nx run-many --target=serve --projects=container,headerMfe,projectListMfe",
+    "dev": "./scripts/dev-with-mfe-tags.sh",
     "build": "nx run-many --target=build --all",
     "build:prod": "nx run-many --target=build --all --exclude=\"*-e2e\"",
     "lint": "nx run-many --target=lint --all",
