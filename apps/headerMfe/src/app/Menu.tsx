@@ -1,6 +1,7 @@
 import { config } from '@thommf-portfolio/config';
 import { useState } from 'react';
-import { NavLinks } from './NavLinks';
+import { LanguageToggle } from './LanguageToggle/LanguageToggle';
+import { NavLinks } from './NavLinks/NavLinks';
 import './Menu.scss';
 
 export function Menu() {
@@ -22,6 +23,7 @@ export function Menu() {
       {/* Desktop Navigation */}
       <nav className="desktop-nav">
         <NavLinks currentPath={currentPath} variant="desktop" />
+        <LanguageToggle variant="desktop" />
       </nav>
 
       {/* Hamburger Menu Button for Mobile */}
@@ -40,6 +42,7 @@ export function Menu() {
         </button>
         <nav>
           <NavLinks currentPath={currentPath} variant="mobile" onClick={toggleMenu} />
+          <LanguageToggle variant="mobile" onToggle={toggleMenu} />
         </nav>
       </div>
     </header>
