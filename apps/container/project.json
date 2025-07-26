@@ -70,5 +70,6 @@
         "staticFilePath": "apps/container/dist"
       }
     }
-  }
+  },
+  "implicitDependencies": ["store"]
 }

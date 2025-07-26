@@ -1,0 +1,55 @@
+/* --- Language Toggle --- */
+.language-toggle {
+  background: none;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  margin-left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  opacity: 0.8;
+
+  &:hover {
+    opacity: 1;
+    border-color: rgba(255, 255, 255, 0.6);
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .flag-icon {
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  .language-text {
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  // Mobile version
+  &.mobile {
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 1rem 1.5rem;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    margin: 0;
+    width: auto;
+    
+    .flag-icon {
+      font-size: 1.5rem;
+    }
+
+    .language-text {
+      font-size: 1.1rem;
+    }
+
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+  }
+}
