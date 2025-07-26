@@ -23,6 +23,9 @@
     },
     {
       "path": "./libs/shared/config"
+    },
+    {
+      "path": "./libs/store"
     }
   ]
 }
