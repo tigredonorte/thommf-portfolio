@@ -3,6 +3,9 @@
   "include": [],
   "references": [
     {
+      "path": "../../libs/portfolio-store"
+    },
+    {
       "path": "../../libs/shared/config"
     },
     {

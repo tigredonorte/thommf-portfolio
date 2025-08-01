@@ -26,6 +26,9 @@
     },
     {
       "path": "./libs/store"
+    },
+    {
+      "path": "./libs/portfolio-store"
     }
   ]
 }

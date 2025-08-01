@@ -10,52 +10,55 @@ jest.mock('@thommf-portfolio/config', () => ({
       linkedin: 'https://linkedin.com/in/thomfilg',
       github: 'https://github.com/tigredonorte',
     },
-    experience: [
-      {
-        company: 'Test Company',
-        url: 'https://test.com',
-        role: 'Full Stack Engineer',
-        startDate: 'Jan 2023',
-        endDate: 'Present',
-        projects: [
-          {
-            title: 'Test Project 1',
-            description: 'A test project using React and Node.js',
-            tech: ['React', 'Node.js', 'MongoDB'],
-            images: ['/test1.jpg'],
-            url: 'https://test1.com',
-            isOnline: true,
-            industry: 'Fintech',
-          },
-          {
-            title: 'Test Project 2',
-            description: 'Another test project with Angular',
-            tech: ['Angular', 'TypeScript'],
-            images: ['/test2.jpg'],
-            isOnline: false,
-            industry: 'E-commerce',
-          },
-        ],
-      },
-      {
-        company: 'Another Company',
-        role: 'Frontend Developer',
-        startDate: 'Jun 2022',
-        endDate: 'Dec 2022',
-        projects: [
-          {
-            title: 'Frontend Project',
-            description: 'A frontend project using Vue.js',
-            tech: ['Vue.js', 'JavaScript'],
-            images: ['/test3.jpg'],
-            isOnline: true,
-            industry: 'Healthcare',
-          },
-        ],
-      },
-    ],
-    highlightedFilters: ['Angular', 'React', 'Node.js', 'MongoDB', 'Fintech'],
   },
+}));
+
+// Mock the portfolio-store module
+jest.mock('@thommf-portfolio/portfolio-store', () => ({
+  portfolioEn: [
+    {
+      company: 'Test Company',
+      url: 'https://test.com',
+      role: 'Full Stack Engineer',
+      startDate: 'Jan 2023',
+      endDate: 'Present',
+      projects: [
+        {
+          title: 'Test Project 1',
+          description: 'A test project using React and Node.js',
+          tech: ['React', 'Node.js', 'MongoDB'],
+          images: ['/test1.jpg'],
+          url: 'https://test1.com',
+          isOnline: true,
+          industry: 'Fintech',
+        },
+        {
+          title: 'Test Project 2',
+          description: 'Another test project with Angular',
+          tech: ['Angular', 'TypeScript'],
+          images: ['/test2.jpg'],
+          isOnline: false,
+          industry: 'E-commerce',
+        },
+      ],
+    },
+    {
+      company: 'Another Company',
+      role: 'Frontend Developer',
+      startDate: 'Jun 2022',
+      endDate: 'Dec 2022',
+      projects: [
+        {
+          title: 'Frontend Project',
+          description: 'A frontend project using Vue.js',
+          tech: ['Vue.js', 'JavaScript'],
+          images: ['/test3.jpg'],
+          isOnline: true,
+          industry: 'Healthcare',
+        },
+      ],
+    },
+  ],
 }));
 
 // Mock ESM modules
