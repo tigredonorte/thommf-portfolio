@@ -20,6 +20,9 @@
     "baseUrl": ".",
     "paths": {
       "@thommf-portfolio/config": ["libs/shared/config/src/index.ts"],
+      "@thommf-portfolio/portfolio-store": [
+        "libs/portfolio-store/src/index.ts"
+      ],
       "@thommf-portfolio/store": ["libs/store/src/index.ts"]
     }
   }

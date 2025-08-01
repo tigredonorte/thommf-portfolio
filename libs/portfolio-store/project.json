@@ -1,0 +1,30 @@
+{
+  "name": "portfolio-store",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/portfolio-store/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project portfolio-store --web",
+  "targets": {
+    "build": {
+      "executor": "@nx/rollup:rollup",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/portfolio-store",
+        "main": "libs/portfolio-store/src/index.ts",
+        "tsConfig": "libs/portfolio-store/tsconfig.lib.json"
+      }
+    },
+    "watch": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/shared/config",
+        "main": "libs/portfolio-store/src/index.ts",
+        "tsConfig": "libs/portfolio-store/tsconfig.json",
+        "assets": ["libs/portfolio-store/*.md"],
+        "watch": true
+      }
+    }
+  }
+}
