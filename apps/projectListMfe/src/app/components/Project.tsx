@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Carousel } from "react-responsive-carousel";
 import { LazyLoadImage } from "react-lazy-load-image-component";
-import { IProject } from "@thommf-portfolio/config";
+import { IProject } from "@thommf-portfolio/portfolio-store";
 import Lightbox from "yet-another-react-lightbox";
 import classNames from "classnames";
 import "react-responsive-carousel/lib/styles/carousel.min.css";
