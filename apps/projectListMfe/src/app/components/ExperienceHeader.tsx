@@ -1,4 +1,4 @@
-import { IExperience } from '@thommf-portfolio/config';
+import { IExperience } from '@thommf-portfolio/portfolio-store';
 import './ExperienceHeader.scss';
 
 interface ExperienceHeaderProps {

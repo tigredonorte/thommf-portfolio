@@ -1,13 +1,14 @@
 import { config } from '@thommf-portfolio/config';
+import { portfolioEn } from '@thommf-portfolio/portfolio-store';
 import { useCallback, useMemo, useState } from 'react';
 import './app.scss';
 import { Experience } from './components/Experience';
-import { Filter, Suggestion, HighlightedFilters } from './components/Filter';
+import { Filter, HighlightedFilters, Suggestion } from './components/Filter';
 import { ExperienceProvider } from './contexts/ExperienceContext';
 
 const getAllSuggestions = (): Suggestion[] => {
   const allSearchableTerms = new Set<string>();
-  config.experience.forEach((exp) => {
+  portfolioEn.forEach((exp) => {
     exp.projects.forEach((proj) => {
       proj.tech.forEach((t) => allSearchableTerms.add(t));
       if (proj.industry) {
@@ -81,11 +82,11 @@ export function App() {
   
   const filteredExperience = useMemo(() => {
     const lowercasedFilter = searchTerm.toLowerCase();
-    if (!lowercasedFilter) return config.experience;
+    if (!lowercasedFilter) return portfolioEn;
 
     const isKnownTerm = allSuggestions.some(s => s.type === 'search' && s.text.toLowerCase() === lowercasedFilter);
 
-    return config.experience
+    return portfolioEn
       .map((exp) => {
         const filteredProjects = exp.projects.filter((proj) => {
           if (isKnownTerm) {

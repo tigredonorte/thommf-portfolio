@@ -1,4 +1,4 @@
-import { IProject } from '@thommf-portfolio/config';
+import { IProject } from '@thommf-portfolio/portfolio-store';
 import { Project } from './Project';
 import './ProjectList.scss';
 
