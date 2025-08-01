@@ -19,7 +19,6 @@ const portfolioSlice = createSlice({
     
     setSearchFilters: (state, action: PayloadAction<string[]>) => {
       state.searchFilters = action.payload;
-      // Apply filtering logic
       state.filteredExperiences = filterExperiences(state.experiences, {
         searchTerms: action.payload,
       });

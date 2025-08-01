@@ -1,4 +1,3 @@
-import { portfolioEn } from "./en.js";
 import { PortfolioConfig } from "./types.js";
 
 export const config: PortfolioConfig = {
@@ -8,5 +7,4 @@ export const config: PortfolioConfig = {
     linkedin: 'https://linkedin.com/in/thomfilg',
     github: 'https://github.com/tigredonorte',
   },
-  experience: portfolioEn,
 };

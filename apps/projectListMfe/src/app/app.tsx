@@ -1,32 +1,17 @@
-import { config } from '@thommf-portfolio/config';
+
+import {
+  clearAllFilters,
+  selectFilteredExperiences,
+  selectFilterSuggestions,
+  setSearchFilters
+} from '@thommf-portfolio/portfolio-store';
+
+import { useAppDispatch, useAppSelector } from '@thommf-portfolio/store';
 import { useCallback, useMemo, useState } from 'react';
 import './app.scss';
 import { Experience } from './components/Experience';
-import { Filter, Suggestion, HighlightedFilters } from './components/Filter';
+import { Filter, HighlightedFilters, Suggestion } from './components/Filter';
 import { ExperienceProvider } from './contexts/ExperienceContext';
-
-const getAllSuggestions = (): Suggestion[] => {
-  const allSearchableTerms = new Set<string>();
-  config.experience.forEach((exp) => {
-    exp.projects.forEach((proj) => {
-      proj.tech.forEach((t) => allSearchableTerms.add(t));
-      if (proj.industry) {
-        allSearchableTerms.add(proj.industry);
-      }
-    });
-  });
-
-  const searchSuggestions: Suggestion[] = Array.from(allSearchableTerms)
-    .sort((a, b) => a.localeCompare(b))
-    .map(term => ({ text: term, type: 'search' }));
-
-  const linkSuggestions: Suggestion[] = [
-    { text: 'GitHub Profile', type: 'link', url: config.socials.github },
-    { text: 'LinkedIn Profile', type: 'link', url: config.socials.linkedin },
-  ];
-
-  return [...searchSuggestions, ...linkSuggestions];
-};
 
 const highlightedTechnologies = [
   'Angular',
@@ -39,26 +24,50 @@ const highlightedTechnologies = [
 export function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedHighlighted, setHighlightedTechnology] = useState('');
-  const allSuggestions = useMemo(() => getAllSuggestions(), []);
+  const dispatch = useAppDispatch();
+  
+  const filteredExperiences = useAppSelector(selectFilteredExperiences);
+  const filterSuggestions = useAppSelector(selectFilterSuggestions);
+
+  const allSuggestions = useMemo(() => {
+    return filterSuggestions.map(suggestion => ({
+      text: suggestion.text,
+      type: 'search' as const
+    }));
+  }, [filterSuggestions]);
 
   const handleFilterChange = useCallback((term: string) => {
     setSearchTerm(term);
-  }, []);
+    
+    if (term.trim()) {
+      dispatch(setSearchFilters([term.trim()]));
+
+      if (selectedHighlighted && selectedHighlighted !== term.trim()) {
+        setHighlightedTechnology('');
+      }
+    } else {
+      console.log('Search term is empty, clearing all filters');
+      dispatch(clearAllFilters());
+      setHighlightedTechnology('');
+    }
+  }, [dispatch, selectedHighlighted]);
 
   const handleHighlightedFilterSelect = useCallback((term: string) => {
     if (selectedHighlighted === term) {
       setHighlightedTechnology('');
       setSearchTerm('');
+      dispatch(clearAllFilters());
       return;
     }
 
     setHighlightedTechnology(term);
     setSearchTerm(term);
+    dispatch(setSearchFilters([term]));
     
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-  }, [selectedHighlighted]);
+  }, [selectedHighlighted, dispatch]);
 
   const filteredSuggestions = useMemo(() => {
     if (!searchTerm) return [];
@@ -78,34 +87,6 @@ export function App() {
 
     return [...startsWithMatches, ...includesMatches];
   }, [searchTerm, allSuggestions]);
-  
-  const filteredExperience = useMemo(() => {
-    const lowercasedFilter = searchTerm.toLowerCase();
-    if (!lowercasedFilter) return config.experience;
-
-    const isKnownTerm = allSuggestions.some(s => s.type === 'search' && s.text.toLowerCase() === lowercasedFilter);
-
-    return config.experience
-      .map((exp) => {
-        const filteredProjects = exp.projects.filter((proj) => {
-          if (isKnownTerm) {
-            const techMatch = proj.tech?.some((t) => t.toLowerCase() === lowercasedFilter);
-            const industryMatch = proj.industry?.toLowerCase() === lowercasedFilter;
-            return techMatch || industryMatch;
-          }
-          const textMatch =
-            (proj.title && proj.title.toLowerCase().includes(lowercasedFilter)) ||
-            (proj.description && proj.description.toLowerCase().includes(lowercasedFilter)) ||
-            (proj.industry && proj.industry.toLowerCase().includes(lowercasedFilter)) ||
-            (exp.company && exp.company.toLowerCase().includes(lowercasedFilter)) ||
-            (proj.tech && proj.tech.some((t) => t && t.toLowerCase().includes(lowercasedFilter)));
-          
-          return textMatch;
-        });
-        return { ...exp, projects: filteredProjects };
-      })
-      .filter((exp) => exp.projects.length > 0);
-  }, [searchTerm, allSuggestions]);
 
   return (
     <div className="wrapper">
@@ -123,8 +104,8 @@ export function App() {
         />
       </Filter>
 
-      {filteredExperience.length > 0 ? (
-        filteredExperience.map((experience) => (
+      {filteredExperiences.length > 0 ? (
+        filteredExperiences.map((experience) => (
           <ExperienceProvider experience={experience} key={experience.company}>
             <Experience />
           </ExperienceProvider>

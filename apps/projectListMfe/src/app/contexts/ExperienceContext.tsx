@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode } from 'react';
-import { IExperience } from '@thommf-portfolio/config';
+import { IExperience } from '@thommf-portfolio/portfolio-store';
 
 interface ExperienceContextType {
   experience: IExperience;

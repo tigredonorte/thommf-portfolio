@@ -3,7 +3,10 @@
   "include": [],
   "references": [
     {
-      "path": "../../libs/shared/config"
+      "path": "../../libs/portfolio-store"
+    },
+    {
+      "path": "../../libs/store"
     },
     {
       "path": "./tsconfig.app.json"

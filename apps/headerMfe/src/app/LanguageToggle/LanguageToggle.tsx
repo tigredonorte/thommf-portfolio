@@ -1,7 +1,7 @@
 import { useAppSelector, useAppDispatch, setLanguage, selectCurrentLanguage } from '@thommf-portfolio/store';
 import { FiGlobe } from 'react-icons/fi';
 import './LanguageToggle.scss';
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 
 const DISABLE_LANGUAGE_TOGGLE = true;
 const FLAG_ICONS = {
@@ -18,8 +18,17 @@ export const LanguageToggle = ({ variant = 'desktop', onToggle }: LanguageToggle
   const currentLanguage = useAppSelector(selectCurrentLanguage);
   const dispatch = useAppDispatch();
 
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem('portfolio-language') as 'en' | 'pt' | null;
+    if (savedLanguage && ['en', 'pt'].includes(savedLanguage)) {
+      dispatch(setLanguage(savedLanguage));
+    }
+  }, [dispatch]);
+
   const handleLanguageToggle = useCallback(() => {
-    dispatch(setLanguage(currentLanguage === 'en' ? 'pt' : 'en'));
+    const newLanguage = currentLanguage === 'en' ? 'pt' : 'en';
+    localStorage.setItem('portfolio-language', newLanguage);
+    dispatch(setLanguage(newLanguage));
     onToggle?.();
   }, [currentLanguage, dispatch, onToggle]);
 

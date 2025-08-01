@@ -26,6 +26,9 @@
   "references": [
     {
       "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "../../libs/portfolio-store/tsconfig.lib.json"
     }
   ]
 }
