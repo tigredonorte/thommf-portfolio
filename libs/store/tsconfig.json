@@ -11,6 +11,9 @@
   "include": [],
   "references": [
     {
+      "path": "../portfolio-store"
+    },
+    {
       "path": "./tsconfig.lib.json"
     },
     {
