@@ -15,4 +15,4 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY . .
 
-CMD ["sh", "-c", "npx wait-on $APP_URL && pnpm test:e2e"]
+CMD ["sh", "-c", "npx wait-on $APP_URL && pnpm e2e"]
