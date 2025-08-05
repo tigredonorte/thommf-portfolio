@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import * as ReactDOM from 'react-dom/client';
+import { StoreProvider } from '@thommf-portfolio/store';
 
 import Menu from './app/Menu';
 
@@ -8,6 +9,8 @@ const root = ReactDOM.createRoot(
 );
 root.render(
   <StrictMode>
-    <Menu />
+    <StoreProvider>
+      <Menu />
+    </StoreProvider>
   </StrictMode>
 );

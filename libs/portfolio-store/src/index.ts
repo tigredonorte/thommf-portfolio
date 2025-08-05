@@ -5,7 +5,6 @@ export * from './lib/selectors';
 export * from './lib/hooks';
 export * from './lib/portfolioMiddleware';
 export * from './lib/setup';
-export * from './lib/lang/en'
 
 // Default reducer export
-export { default as portfolioReducer } from './lib/portfolioSlice';
+export { portfolioReducer } from './lib/portfolioSlice';
