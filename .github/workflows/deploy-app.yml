@@ -13,18 +13,6 @@ on:
       - 'tsconfig*.json'
       - '.github/workflows/**'
       - 'infra/**'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'infra/**'
-      - 'apps/**'
-      - 'libs/**'
-      - 'package.json'
-      - 'pnpm-lock.yaml'
-      - 'nx.json'
-      - 'tsconfig*.json'
-      - '.github/workflows/**'
-      - 'infra/**'
   workflow_run:
     workflows: ["Deploy Infrastructure"]
     types: [completed]
