@@ -19,6 +19,12 @@ services:
       retries: 20
       start_period: 10s
       start_interval: 10s
+    volumes:
+      - ../../:/workspace
+      - ../../node_modules:/workspace/node_modules
+    profiles:
+      - app
+      - e2e
     labels:
       - "traefik.enable=false"
       - "description=Production test environment for micro-frontend portfolio"
@@ -38,8 +44,10 @@ services:
         condition: service_healthy
     volumes:
       - ../../:/workspace
-      - /workspace/node_modules
+      - ../../node_modules:/workspace/node_modules
     working_dir: /workspace
+    profiles:
+      - e2e
     environment:
       - CI=true
       - APP_URL=${APP_URL:-http://frontend-static}
