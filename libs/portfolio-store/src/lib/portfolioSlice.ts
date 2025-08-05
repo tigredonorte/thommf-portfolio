@@ -1,9 +1,10 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PortfolioState, IExperience, FilterCriteria } from './portfolioTypes';
+import { portfolioEn } from './lang/en';
 
 export const initialState: PortfolioState = {
-  experiences: [],
-  filteredExperiences: [],
+  experiences: portfolioEn,
+  filteredExperiences: portfolioEn,
   searchFilters: [],
   highlightedFilters: [],
 };
@@ -60,24 +61,40 @@ function filterExperiences(experiences: IExperience[], criteria: FilterCriteria)
     return experiences;
   }
 
-  return experiences.map(experience => {
-    const filteredProjects = experience.projects.filter(project => {
-      return criteria.searchTerms?.some(term => {
-        const termLower = term.toLowerCase();
-        return (
-          project.title.toLowerCase().includes(termLower) ||
-          project.description.toLowerCase().includes(termLower) ||
-          project.tech.some(tech => tech.toLowerCase().includes(termLower)) ||
-          (project.industry && project.industry.toLowerCase().includes(termLower))
-        );
-      }) || false;
-    });
+  const termsLower = criteria.searchTerms.map(t => t.toLowerCase().trim());
 
-    return {
-      ...experience,
-      projects: filteredProjects,
-    };
-  }).filter(experience => experience.projects.length > 0);
+  return experiences
+    .map(experience => {
+      // Check if the search term matches the company or role
+      const isExperienceMatch = termsLower.some(term =>
+        experience.company.toLowerCase().includes(term) ||
+        experience.role.toLowerCase().includes(term)
+      );
+
+      // If the company/role matches, return the whole experience with all its projects
+      if (isExperienceMatch) {
+        return experience;
+      }
+
+      // If not, check if any projects match (original behavior)
+      const matchingProjects = experience.projects.filter(project => {
+        return termsLower.some(term =>
+          project.title.toLowerCase().includes(term) ||
+          project.description.toLowerCase().includes(term) ||
+          project.tech.some(tech => tech.toLowerCase().includes(term)) ||
+          (project.industry && project.industry.toLowerCase().includes(term))
+        );
+      });
+
+      // If only projects matched, return the experience with just those projects
+      if (matchingProjects.length > 0) {
+        return { ...experience, projects: matchingProjects };
+      }
+
+      // If no match at all, return null to be filtered out
+      return null;
+    })
+    .filter((experience): experience is IExperience => experience !== null);
 }
 
 export const {
@@ -101,4 +118,4 @@ export const portfolioActions = {
 };
 
 
-export default portfolioSlice.reducer;
+export const portfolioReducer = portfolioSlice.reducer;

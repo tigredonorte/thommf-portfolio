@@ -35,4 +35,4 @@ export const languageSlice: Slice<LanguageState> = createSlice({
 
 export const setLanguage = languageSlice.actions.setLanguage as ActionCreatorWithPayload<'en' | 'pt', string>;
 
-export default languageSlice.reducer;
+export const languageReducer = languageSlice.reducer;

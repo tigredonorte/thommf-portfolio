@@ -1,4 +1,4 @@
-import portfolioReducer, { initialState } from './portfolioSlice';
+import { portfolioReducer, initialState } from './portfolioSlice';
 
 describe('portfolioSlice', () => {
   it('should set initial state', () => {
