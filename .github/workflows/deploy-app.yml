@@ -73,12 +73,11 @@ jobs:
 
       - name: Sync files to S3
         run: |
-          # Get the bucket name from infrastructure job outputs or fallback to variable
-          BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
-          if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
-          fi
-          
+          # Consistently construct the bucket name to match Terraform's output
+          ENVIRONMENT_NAME_RAW="${{ github.event.inputs.environment || 'Production' }}"
+          ENVIRONMENT_NAME=$(echo "$ENVIRONMENT_NAME_RAW" | tr '[:upper:]' '[:lower:]')
+          BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-$ENVIRONMENT_NAME"
+
           echo "📦 Using S3 bucket: $BUCKET_NAME"
           
           # Sync container app files to root
