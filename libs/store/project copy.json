@@ -1,0 +1,31 @@
+{
+  "name": "store",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/store/src",
+  "projectType": "library",
+  "tags": [],
+  "// targets": "to see all targets run: nx show project store --web",
+  "targets": {
+    "build": {
+      "executor": "@nx/rollup:rollup",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/store",
+        "main": "libs/store/src/index.ts",
+        "tsConfig": "libs/store/tsconfig.lib.json",
+        "external": ["react", "react-dom", "react/jsx-runtime", "@thommf-portfolio/portfolio-store"]
+      }
+    },
+    "typecheck": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/libs/store",
+        "main": "libs/store/src/index.ts",
+        "tsConfig": "libs/store/tsconfig.lib.json",
+        "assets": ["libs/store/*.md"]
+      }
+    }
+  },
+  "implicitDependencies": ["portfolio-store"]
+}

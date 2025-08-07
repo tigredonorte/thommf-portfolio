@@ -9,6 +9,7 @@ module.exports = withNx(
     tsConfig: './tsconfig.lib.json',
     compiler: 'babel',
     external: ['react', 'react-dom', 'react/jsx-runtime'],
+    // external: ['react', 'react-dom', 'react/jsx-runtime', '@thommf-portfolio/portfolio-store'],
     format: ['esm'],
     assets: [{ input: '.', output: '.', glob: 'README.md' }],
   },

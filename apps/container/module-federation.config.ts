@@ -1,4 +1,5 @@
 import { ModuleFederationConfig } from '@nx/module-federation';
+const { createSharedConfig } = require('../createSharedConfig');
 
 const config: ModuleFederationConfig = {
   name: 'container',
@@ -15,6 +16,7 @@ const config: ModuleFederationConfig = {
    *
    */
   remotes: ['headerMfe', 'projectListMfe'],
+  shared: createSharedConfig()
 };
 
 /**
