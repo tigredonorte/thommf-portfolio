@@ -1,10 +1,12 @@
 import { ModuleFederationConfig } from '@nx/module-federation';
+const { createSharedConfig } = require('../createSharedConfig');
 
 const config: ModuleFederationConfig = {
   name: 'projectListMfe',
   exposes: {
     './Module': './src/remote-entry.ts',
   },
+  shared: createSharedConfig()
 };
 
 /**
