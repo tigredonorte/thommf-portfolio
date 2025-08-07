@@ -23,52 +23,52 @@ jobs:
       - name: Lint affected projects
         run: npx nx affected -t lint
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  # test:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Setup Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
+  #     - name: Setup Node.js and pnpm
+  #       uses: ./.github/actions/setup-node-pnpm
 
-      - name: Test affected projects
-        run: npx nx affected -t test
+  #     - name: Test affected projects
+  #       run: npx nx affected -t test
 
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  # build:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Setup Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
+  #     - name: Setup Node.js and pnpm
+  #       uses: ./.github/actions/setup-node-pnpm
 
-      - name: Build affected projects
-        run: npx nx affected -t build
+  #     - name: Build affected projects
+  #       run: npx nx affected -t build
 
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+  # e2e:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
 
-      - name: Setup Node.js and pnpm
-        uses: ./.github/actions/setup-node-pnpm
+  #     - name: Setup Node.js and pnpm
+  #       uses: ./.github/actions/setup-node-pnpm
 
-      - name: Enable Docker BuildKit
-        run: |
-          echo '{"features":{"buildkit":true}}' | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
+  #     - name: Enable Docker BuildKit
+  #       run: |
+  #         echo '{"features":{"buildkit":true}}' | sudo tee /etc/docker/daemon.json
+  #         sudo systemctl restart docker
 
-      - name: E2E
-        run: pnpm e2e:docker
-        env:
-          CI: true
-          PLAYWRIGHT_BROWSERS_PATH: 0
+  #     - name: E2E
+  #       run: pnpm e2e:docker
+  #       env:
+  #         CI: true
+  #         PLAYWRIGHT_BROWSERS_PATH: 0

@@ -37,7 +37,7 @@ locals {
 # S3 Bucket for static website
 # ============================
 resource "aws_s3_bucket" "portfolio_bucket" {
-  bucket = "${var.bucket_name}-${var.environment}"
+  bucket = var.bucket_name
 
   tags = {
     Name        = "Portfolio Website - ${var.environment}"
@@ -81,8 +81,8 @@ resource "aws_s3_bucket_public_access_block" "portfolio_public_access_block" {
 # CloudFront Origin Access Control
 # ============================
 resource "aws_cloudfront_origin_access_control" "portfolio_oac" {
-  name                              = "portfolio-oac"
-  description                       = "OAC for Portfolio S3 bucket"
+  name                              = "portfolio-oac-${var.environment}"
+  description                       = "OAC for Portfolio S3 bucket - ${var.environment}"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"
