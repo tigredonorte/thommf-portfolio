@@ -1,5 +1,9 @@
 name: Deploy Application
 
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  TERRAFORM_VERSION: ${{ vars.TERRAFORM_VERSION || '1.7.0' }}
+
 on:
   push:
     branches: [main]
@@ -28,9 +32,6 @@ on:
           - Production
           - Development
 
-env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-
 permissions:
   id-token: write # Required for OIDC
   contents: read # Required for actions/checkout
@@ -48,6 +49,7 @@ jobs:
   deploy:
     needs: [infrastructure]
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'Production' }}
     if: |
       needs.infrastructure.result == 'success' &&
       (github.event_name != 'pull_request' || (vars.DEPLOY_ON_PR == 'true' && github.ref == 'refs/heads/main'))
@@ -73,12 +75,8 @@ jobs:
 
       - name: Sync files to S3
         run: |
-          # Get the bucket name from infrastructure job outputs or fallback to variable
-          BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
-          if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
-          fi
-          
+          # Use the bucket name directly from the repository/environment variable
+          BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
           echo "📦 Using S3 bucket: $BUCKET_NAME"
           
           # Sync container app files to root
@@ -96,6 +94,11 @@ jobs:
               fi
             fi
           done
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       - name: Invalidate CloudFront Cache
         run: |
