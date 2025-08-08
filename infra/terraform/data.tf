@@ -28,7 +28,10 @@ resource "aws_route53_zone" "main" {
 data "aws_acm_certificate" "portfolio_cert" {
   count    = var.create_shared_resources ? 0 : 1
   provider = aws.us_east_1
-  arn      = "arn:aws:acm:us-east-1:456808212788:certificate/0572623a-6b2f-41e3-92ec-c45299efe957"
+  domain   = var.domain_name
+  statuses = ["ISSUED"]
+  types    = ["AMAZON_ISSUED"]
+  most_recent = true
 }
 
 # Create certificate if it doesn't exist (only in prod)
