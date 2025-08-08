@@ -31,6 +31,9 @@ locals {
 
   # Combine the default subdomains (like 'www') with the environment-specific one (if any).
   all_subdomains = concat(var.subdomain_names, local.env_specific_subdomain)
+
+  # Determine if we should use CloudFront with custom domain
+  use_custom_domain = var.create_cloudfront_distribution && var.create_ssl_certificate && var.domain_name != ""
 }
 
 # ============================
@@ -69,19 +72,20 @@ resource "aws_s3_bucket_website_configuration" "portfolio_website" {
 resource "aws_s3_bucket_public_access_block" "portfolio_public_access_block" {
   bucket = aws_s3_bucket.portfolio_bucket.id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  # When using CloudFront, block public access
+  # When not using CloudFront, allow public access for direct S3 website hosting
+  block_public_acls       = var.create_cloudfront_distribution
+  block_public_policy     = var.create_cloudfront_distribution ? true : false
+  ignore_public_acls      = var.create_cloudfront_distribution
+  restrict_public_buckets = var.create_cloudfront_distribution ? true : false
 }
-
-# Route53 Zone and SSL Certificate are managed in data.tf
 
 # ============================
 # CloudFront Origin Access Control
 # ============================
 resource "aws_cloudfront_origin_access_control" "portfolio_oac" {
-  name                              = "portfolio-oac"
+  count                             = var.create_cloudfront_distribution ? 1 : 0
+  name                              = "portfolio-oac-${var.environment}"
   description                       = "OAC for Portfolio S3 bucket"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
@@ -89,12 +93,14 @@ resource "aws_cloudfront_origin_access_control" "portfolio_oac" {
 }
 
 # ============================
-# CloudFront Distribution
+# CloudFront Distribution (WITH CONDITIONAL CERTIFICATE)
 # ============================
 resource "aws_cloudfront_distribution" "portfolio_distribution" {
+  count = var.create_cloudfront_distribution ? 1 : 0
+
   origin {
     domain_name              = aws_s3_bucket.portfolio_bucket.bucket_regional_domain_name
-    origin_access_control_id = aws_cloudfront_origin_access_control.portfolio_oac.id
+    origin_access_control_id = aws_cloudfront_origin_access_control.portfolio_oac[0].id
     origin_id                = "S3-${aws_s3_bucket.portfolio_bucket.bucket}"
   }
 
@@ -102,7 +108,8 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
 
-  aliases = concat([var.domain_name], local.all_subdomains)
+  # Only set aliases if we have a valid certificate
+  aliases = local.use_custom_domain ? concat([var.domain_name], local.all_subdomains) : []
 
   default_cache_behavior {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
@@ -145,24 +152,42 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
     }
   }
 
-  viewer_certificate {
-    acm_certificate_arn            = local.acm_certificate_arn
-    ssl_support_method             = "sni-only"
-    minimum_protocol_version       = "TLSv1.2_2021"
-    cloudfront_default_certificate = false
+  # Dynamic viewer certificate configuration
+  dynamic "viewer_certificate" {
+    for_each = local.use_custom_domain ? [1] : []
+    content {
+      acm_certificate_arn      = local.acm_certificate_arn
+      ssl_support_method       = "sni-only"
+      minimum_protocol_version = "TLSv1.2_2021"
+    }
+  }
+
+  # Use CloudFront default certificate if no custom domain
+  dynamic "viewer_certificate" {
+    for_each = local.use_custom_domain ? [] : [1]
+    content {
+      cloudfront_default_certificate = true
+    }
   }
 
   tags = {
-    Name        = "Portfolio CloudFront Distribution"
+    Name        = "Portfolio CloudFront Distribution - ${var.environment}"
     Environment = var.resource_tag_environment
     Project     = "thommf-portfolio"
   }
+
+  depends_on = [
+    aws_acm_certificate_validation.portfolio_cert_validation
+  ]
 }
 
 # ============================
-# S3 Bucket Policy for CloudFront OAC
+# S3 Bucket Policy (Conditional)
 # ============================
+
+# Policy for CloudFront OAC access
 resource "aws_s3_bucket_policy" "portfolio_bucket_policy_cloudfront" {
+  count  = var.create_cloudfront_distribution ? 1 : 0
   bucket = aws_s3_bucket.portfolio_bucket.id
 
   policy = jsonencode({
@@ -178,39 +203,67 @@ resource "aws_s3_bucket_policy" "portfolio_bucket_policy_cloudfront" {
         Resource = "${aws_s3_bucket.portfolio_bucket.arn}/*"
         Condition = {
           StringEquals = {
-            "AWS:SourceArn" = aws_cloudfront_distribution.portfolio_distribution.arn
+            "AWS:SourceArn" = aws_cloudfront_distribution.portfolio_distribution[0].arn
           }
         }
       }
     ]
   })
+
+  depends_on = [
+    aws_s3_bucket_public_access_block.portfolio_public_access_block
+  ]
+}
+
+# Policy for direct S3 website access (when not using CloudFront)
+resource "aws_s3_bucket_policy" "portfolio_bucket_policy_public" {
+  count  = var.create_cloudfront_distribution ? 0 : 1
+  bucket = aws_s3_bucket.portfolio_bucket.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.portfolio_bucket.arn}/*"
+      }
+    ]
+  })
+
+  depends_on = [
+    aws_s3_bucket_public_access_block.portfolio_public_access_block
+  ]
 }
 
 # ============================
 # DNS Records (Root + Subdomains)
 # ============================
 resource "aws_route53_record" "portfolio_apex" {
+  count   = var.create_route53_records && var.create_cloudfront_distribution ? 1 : 0
   zone_id = local.route53_zone_id
   name    = var.domain_name
   type    = "A"
 
   alias {
-    name                   = aws_cloudfront_distribution.portfolio_distribution.domain_name
-    zone_id                = aws_cloudfront_distribution.portfolio_distribution.hosted_zone_id
+    name                   = aws_cloudfront_distribution.portfolio_distribution[0].domain_name
+    zone_id                = aws_cloudfront_distribution.portfolio_distribution[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
 
 resource "aws_route53_record" "portfolio_subdomains" {
-  for_each = toset(local.all_subdomains)
+  for_each = var.create_route53_records && var.create_cloudfront_distribution ? toset(local.all_subdomains) : toset([])
 
   zone_id = local.route53_zone_id
   name    = each.key
   type    = "A"
 
   alias {
-    name                   = aws_cloudfront_distribution.portfolio_distribution.domain_name
-    zone_id                = aws_cloudfront_distribution.portfolio_distribution.hosted_zone_id
+    name                   = aws_cloudfront_distribution.portfolio_distribution[0].domain_name
+    zone_id                = aws_cloudfront_distribution.portfolio_distribution[0].hosted_zone_id
     evaluate_target_health = false
   }
 }

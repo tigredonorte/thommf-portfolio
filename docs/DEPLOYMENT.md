@@ -35,7 +35,7 @@ To use the GitHub Actions workflow for deployment, you need to add these secrets
 - **`S3_BUCKET_NAME`** - Your S3 bucket name (e.g., `portfolio.thomfilg.com`)
 
 #### **Optional Secrets** (For custom domain)
-- **`DOMAIN_NAMES`** - JSON array of domain names (e.g., `["portfolio.thomfilg.com"]`)
+- **`DOMAIN_NAME`** - JSON array of domain names (e.g., `["portfolio.thomfilg.com"]`)
 - **`SSL_CERTIFICATE_ARN`** - ACM certificate ARN for HTTPS
 - **`HOSTED_ZONE_ID`** - Route 53 hosted zone ID
 
@@ -97,7 +97,7 @@ Value: portfolio.thomfilg.com
 Only add these if you want to use a custom domain:
 
 ```
-Name: DOMAIN_NAMES
+Name: DOMAIN_NAME
 Value: ["portfolio.thomfilg.com"]
 
 Name: SSL_CERTIFICATE_ARN

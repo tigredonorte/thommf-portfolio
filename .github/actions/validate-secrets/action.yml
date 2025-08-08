@@ -16,18 +16,37 @@ runs:
     - name: Validate required secrets
       shell: bash
       run: |
+        echo "🔍 Validating required configuration..."
+        ERRORS=0
+        
         if [ -z "${{ inputs.s3-bucket-name }}" ]; then
-          echo "❌ ERROR: S3_BUCKET_NAME secret is required but not set!"
-          echo "Please set S3_BUCKET_NAME in your GitHub repository or Production environment secrets."
-          exit 1
+          echo "❌ ERROR: S3_BUCKET_NAME is required but not set!"
+          echo "   Please set S3_BUCKET_NAME in your GitHub repository variables."
+          ERRORS=$((ERRORS + 1))
+        else
+          echo "✅ S3_BUCKET_NAME is set"
         fi
+        
         if [ -z "${{ inputs.s3-state-bucket-name }}" ]; then
-          echo "❌ ERROR: S3_STATE_BUCKET_NAME secret is required but not set!"
-          echo "Please set S3_STATE_BUCKET_NAME in your GitHub repository or Production environment secrets."
-          exit 1
+          echo "❌ ERROR: S3_STATE_BUCKET_NAME is required but not set!"
+          echo "   Please set S3_STATE_BUCKET_NAME in your GitHub repository variables."
+          ERRORS=$((ERRORS + 1))
+        else
+          echo "✅ S3_STATE_BUCKET_NAME is set"
         fi
+        
         if [ -z "${{ inputs.aws-role-arn }}" ]; then
           echo "❌ ERROR: AWS_ROLE_ARN secret is required but not set!"
+          echo "   Please set AWS_ROLE_ARN in your GitHub repository secrets."
+          ERRORS=$((ERRORS + 1))
+        else
+          echo "✅ AWS_ROLE_ARN is set"
+        fi
+        
+        if [ $ERRORS -gt 0 ]; then
+          echo ""
+          echo "❌ $ERRORS required configuration(s) missing!"
           exit 1
         fi
-        echo "✅ Required secrets validation passed"
+        
+        echo "✅ All required secrets validated successfully!"

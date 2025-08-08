@@ -52,6 +52,7 @@ services:
       - CI=true
       - APP_URL=${APP_URL:-http://frontend-static}
       - DISPLAY=${DISPLAY}
+      - NX_PROJECT=${NX_PROJECT}
     ipc: host
     cap_add:
       - SYS_ADMIN
