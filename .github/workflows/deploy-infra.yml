@@ -2,6 +2,17 @@ name: Deploy Infrastructure
 
 on:
   workflow_call:
+    inputs:
+      environment:
+        description: "Environment to deploy to (Production or Development)"
+        required: false
+        type: string
+        default: "Production"
+      dry_run:
+        description: "Run terraform plan only (no apply)"
+        required: false
+        type: boolean
+        default: false
     outputs:
       s3-bucket-name:
         description: "The S3 bucket name for the deployed infrastructure"
@@ -65,14 +76,45 @@ jobs:
   terraform-plan:
     runs-on: ubuntu-latest
     needs: [common-env, check-changes]
-    environment: ${{ github.event.inputs.environment || 'Production' }}
+    environment: ${{ inputs.environment || github.event.inputs.environment || 'Production' }}
     if: |
       (github.ref == 'refs/heads/main' || github.event_name == 'pull_request') &&
       (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
       (needs.check-changes.outputs.infra-changed == 'true' || github.event_name == 'workflow_dispatch')
-    steps:      
+    steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set environment slug
+        id: set-env
+        shell: bash
+        run: |
+          if [ -n "${{ vars.STAGE }}" ]; then
+            ENV_SLUG_VAL='${{ vars.STAGE }}'
+          elif [ -n "${STAGE}" ]; then
+            ENV_SLUG_VAL="${STAGE}"
+          else
+            ENV_INPUT="${{ inputs.environment || github.event.inputs.environment || 'Production' }}"
+            if [ "$ENV_INPUT" = "Production" ]; then
+              ENV_SLUG_VAL="prod"
+            else
+              ENV_SLUG_VAL="dev"
+            fi
+          fi
+          echo "ENV_SLUG=$ENV_SLUG_VAL" >> "$GITHUB_ENV"
+          echo "VAR_FILE=terraform-${ENV_SLUG_VAL}.tfvars" >> "$GITHUB_ENV"
+          echo "Using ENV_SLUG=$ENV_SLUG_VAL"
+
+      - name: Compute base bucket name
+        id: base-bucket
+        shell: bash
+        run: |
+          BASE="${{ vars.S3_BUCKET_NAME }}"
+          if [[ "$BASE" == *"-${ENV_SLUG}" ]]; then
+            BASE="${BASE%-${ENV_SLUG}}"
+          fi
+          echo "BASE_BUCKET=$BASE" >> "$GITHUB_ENV"
+          echo "Base bucket: $BASE"
 
       - name: Validate required secrets
         uses: ./.github/actions/validate-secrets
@@ -96,11 +138,10 @@ jobs:
         id: init
         working-directory: infra/terraform
         run: |
-          ENVIRONMENT_NAME=${{ github.event.inputs.environment || 'Production' }}
-          echo "Terraform state key: portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate"
+          echo "Terraform state key: portfolio/${ENV_SLUG}/terraform.tfstate"
           terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate" \
+            -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
             -backend-config="region=${{ needs.common-env.outputs.aws_region }}"
 
       - name: Terraform Format Check
@@ -111,41 +152,108 @@ jobs:
         working-directory: infra/terraform
         run: terraform validate
 
+      - name: Check ACM Certificate Status
+        id: check-cert
+        shell: bash
+        run: |
+          # Check if we should use a custom domain
+          USE_CUSTOM_DOMAIN="false"
+          if [ "${{ vars.CREATE_SSL_CERTIFICATE }}" = "true" ] && [ -n "${{ vars.DOMAIN_NAME }}" ]; then
+            USE_CUSTOM_DOMAIN="true"
+          fi
+          echo "USE_CUSTOM_DOMAIN=$USE_CUSTOM_DOMAIN" >> "$GITHUB_ENV"
+          
+          if [ "$USE_CUSTOM_DOMAIN" = "true" ]; then
+            echo "🔍 Checking for existing ACM certificate for ${{ vars.DOMAIN_NAME }}..."
+            CERT_ARN=$(aws acm list-certificates --region us-east-1 \
+              --query "CertificateSummaryList[?DomainName=='${{ vars.DOMAIN_NAME }}' && Status=='ISSUED'].CertificateArn | [0]" \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$CERT_ARN" ] && [ "$CERT_ARN" != "None" ]; then
+              echo "✅ Found valid certificate: $CERT_ARN"
+              echo "EXISTING_CERT_ARN=$CERT_ARN" >> "$GITHUB_ENV"
+            else
+              echo "⚠️ No valid certificate found for ${{ vars.DOMAIN_NAME }}"
+              echo "📝 Certificate will be created if create_shared_resources=true"
+            fi
+          else
+            echo "ℹ️ Not using custom domain - CloudFront will use default certificate"
+          fi
+
       - name: Terraform Plan
         working-directory: infra/terraform
-        run: terraform plan -out=tfplan # ✅ Generate a plan file
+        run: |
+          if [ -f "${VAR_FILE}" ]; then
+            terraform plan -var-file="${VAR_FILE}" -out=tfplan
+          else
+            echo "⚠️ ${VAR_FILE} not found. Planning with TF_VAR_* only."
+            terraform plan -out=tfplan
+          fi
         env:
-          TF_VAR_bucket_name: ${{ vars.S3_BUCKET_NAME }}
-          TF_VAR_environment: ${{ github.event.inputs.environment || 'Production' }}
+          TF_VAR_bucket_name: ${{ env.BASE_BUCKET }}
+          TF_VAR_environment: ${{ env.ENV_SLUG }}
           TF_VAR_github_repository: ${{ github.repository }}
           TF_VAR_create_iam_resources: true
           TF_VAR_use_oidc: true
-          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}
-          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
-          TF_VAR_create_ssl_certificate: ${{ vars.CREATE_SSL_CERTIFICATE || 'true' }}
+          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || '' }}
+          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '[]' }}
+          TF_VAR_create_ssl_certificate: ${{ env.USE_CUSTOM_DOMAIN }}
           TF_VAR_create_cloudfront_distribution: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}
           TF_VAR_create_route53_records: ${{ vars.CREATE_ROUTE53_RECORDS || 'false' }}
           TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID || '' }}
+          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}
 
       - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v4 # ✅ Upload the plan file
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
           path: infra/terraform/tfplan
 
   deploy-infrastructure:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [common-env, ci, terraform-plan, check-changes]
     if: |
       needs.ci.result == 'success' &&
       needs.terraform-plan.result == 'success' && 
       github.ref == 'refs/heads/main' && 
-      github.event.inputs.dry_run != 'true' &&
+      (inputs.dry_run || github.event.inputs.dry_run) != 'true' &&
       (needs.check-changes.outputs.infra-changed == 'true' || github.event_name == 'workflow_dispatch')
-    environment: ${{ github.event.inputs.environment || 'Production' }}
+    environment: ${{ inputs.environment || github.event.inputs.environment || 'Production' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set environment slug
+        id: set-env
+        shell: bash
+        run: |
+          if [ -n "${{ vars.STAGE }}" ]; then
+            ENV_SLUG_VAL='${{ vars.STAGE }}'
+          elif [ -n "${STAGE}" ]; then
+            ENV_SLUG_VAL="${STAGE}"
+          else
+            ENV_INPUT="${{ inputs.environment || github.event.inputs.environment || 'Production' }}"
+            if [ "$ENV_INPUT" = "Production" ]; then
+              ENV_SLUG_VAL="prod"
+            else
+              ENV_SLUG_VAL="dev"
+            fi
+          fi
+          echo "ENV_SLUG=$ENV_SLUG_VAL" >> "$GITHUB_ENV"
+          echo "VAR_FILE=terraform-${ENV_SLUG_VAL}.tfvars" >> "$GITHUB_ENV"
+          echo "Using ENV_SLUG=$ENV_SLUG_VAL"
+
+      - name: Compute base bucket name
+        id: base-bucket
+        shell: bash
+        run: |
+          BASE="${{ vars.S3_BUCKET_NAME }}"
+          if [[ "$BASE" == *"-${ENV_SLUG}" ]]; then
+            BASE="${BASE%-${ENV_SLUG}}"
+          fi
+          echo "BASE_BUCKET=$BASE" >> "$GITHUB_ENV"
+          echo "Base bucket: $BASE"
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -167,22 +275,187 @@ jobs:
       - name: Terraform Init
         working-directory: infra/terraform
         run: |
-          ENVIRONMENT_NAME=${{ github.event.inputs.environment || 'Production' }}
           terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate" \
+            -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
             -backend-config="region=${{ needs.common-env.outputs.aws_region }}"
+
+      - name: Debug environment and variables
+        run: |
+          echo "🔍 Debug Info:"
+          echo "ENV_SLUG: ${ENV_SLUG}"
+          echo "BASE_BUCKET: ${BASE_BUCKET}"  
+          echo "Expected bucket name: ${BASE_BUCKET}-${ENV_SLUG}"
+          echo "CREATE_SHARED_RESOURCES: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}"
+          echo "CREATE_SSL_CERTIFICATE: ${{ vars.CREATE_SSL_CERTIFICATE || 'false' }}"
+          echo "DOMAIN_NAME: ${{ vars.DOMAIN_NAME || '(not set)' }}"
+          echo "CREATE_CLOUDFRONT_DISTRIBUTION: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}"
+
+      - name: Check ACM Certificate Status
+        id: check-cert
+        shell: bash
+        run: |
+          USE_CUSTOM_DOMAIN="false"
+          if [ "${{ vars.CREATE_SSL_CERTIFICATE }}" = "true" ] && [ -n "${{ vars.DOMAIN_NAME }}" ]; then
+            USE_CUSTOM_DOMAIN="true"
+          fi
+          echo "USE_CUSTOM_DOMAIN=$USE_CUSTOM_DOMAIN" >> "$GITHUB_ENV"
+
+      - name: Clean up conflicting CloudFront distributions
+        shell: bash
+        run: |
+          if [ "${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION }}" = "true" ] && [ "$USE_CUSTOM_DOMAIN" = "true" ]; then
+            echo "🔍 Checking for conflicting CloudFront distributions..."
+            DOMAIN="${{ vars.DOMAIN_NAME }}"
+            
+            # Find distributions using our domain as an alias
+            CONFLICTING_DIST=$(aws cloudfront list-distributions \
+              --query "DistributionList.Items[?contains(Aliases.Items || \`[]\`, '$DOMAIN')].Id | [0]" \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$CONFLICTING_DIST" ] && [ "$CONFLICTING_DIST" != "None" ]; then
+              echo "⚠️ Found conflicting distribution: $CONFLICTING_DIST"
+              # Check if this is our managed distribution
+              DIST_TAGS=$(aws cloudfront list-tags-for-resource \
+                --resource "arn:aws:cloudfront::$(aws sts get-caller-identity --query Account --output text):distribution/$CONFLICTING_DIST" \
+                --query "Tags.Items[?Key=='Environment'].Value | [0]" \
+                --output text 2>/dev/null || echo "")
+              
+              if [ "$DIST_TAGS" = "${{ vars.resource_tag_environment || 'frontend' }}" ]; then
+                echo "ℹ️ Distribution is managed by our Terraform - will be updated"
+              else
+                echo "❌ Distribution is not managed by our Terraform"
+                echo "Please manually remove the alias from distribution $CONFLICTING_DIST"
+              fi
+            else
+              echo "✅ No conflicting CloudFront distributions found"
+            fi
+          fi
+
+      - name: Import existing S3 bucket (idempotent)
+        working-directory: infra/terraform
+        shell: bash
+        env:
+          TF_INPUT: "false"
+          TF_VAR_bucket_name: ${{ env.BASE_BUCKET }}
+          TF_VAR_environment: ${{ env.ENV_SLUG }}
+          TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_create_iam_resources: true
+          TF_VAR_use_oidc: true
+          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || '' }}
+          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '[]' }}
+          TF_VAR_create_ssl_certificate: ${{ env.USE_CUSTOM_DOMAIN }}
+          TF_VAR_create_cloudfront_distribution: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}
+          TF_VAR_create_route53_records: ${{ vars.CREATE_ROUTE53_RECORDS || 'false' }}
+          TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID || '' }}
+          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}
+        run: |
+          set -euo pipefail
+          
+          BUCKET="${BASE_BUCKET}-${ENV_SLUG}"
+          echo "Checking for existing bucket: $BUCKET"
+          if aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then
+            echo "Bucket exists, checking if already imported..."
+            if ! terraform state show aws_s3_bucket.portfolio_bucket >/dev/null 2>&1; then
+              echo "Bucket not in state, attempting terraform import..."
+              terraform import -no-color -input=false aws_s3_bucket.portfolio_bucket "$BUCKET" || true
+            else
+              echo "Bucket already imported to state."
+            fi
+          else
+            echo "Bucket does not exist or not accessible; skipping import."
+          fi
+
+      - name: Import existing CloudFront resources (idempotent)
+        working-directory: infra/terraform
+        shell: bash
+        env:
+          TF_INPUT: "false"
+        run: |
+          set -euo pipefail
+          
+          # Only import if we're managing CloudFront
+          if [ "${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION }}" != "true" ]; then
+            echo "CloudFront distribution management disabled, skipping imports"
+            exit 0
+          fi
+          
+          # Import OAC if it exists
+          OAC_NAME="portfolio-oac-${ENV_SLUG}"
+          echo "Checking for existing CloudFront OAC: $OAC_NAME"
+          OAC_ID=$(aws cloudfront list-origin-access-controls --query "OriginAccessControlList.Items[?Name=='${OAC_NAME}'].Id" --output text 2>/dev/null || true)
+          if [ -n "$OAC_ID" ] && [ "$OAC_ID" != "None" ]; then
+            echo "Found OAC ID: $OAC_ID. Checking if already imported..."
+            if ! terraform state show aws_cloudfront_origin_access_control.portfolio_oac[0] >/dev/null 2>&1; then
+              echo "OAC not in state, importing..."
+              terraform import -no-color -input=false 'aws_cloudfront_origin_access_control.portfolio_oac[0]' "$OAC_ID" || true
+            else
+              echo "OAC already imported to state."
+            fi
+          else
+            echo "No existing OAC found; will be created."
+          fi
+          
+          # Import CloudFront distribution if it exists
+          BUCKET="${BASE_BUCKET}-${ENV_SLUG}"
+          echo "Checking for existing CloudFront distribution with origin: $BUCKET"
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Origins.Items[*].DomainName, '${BUCKET}')].Id | [0]" \
+            --output text 2>/dev/null || true)
+          
+          if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ]; then
+            echo "Found Distribution ID: $DIST_ID. Checking if already imported..."
+            if ! terraform state show 'aws_cloudfront_distribution.portfolio_distribution[0]' >/dev/null 2>&1; then
+              echo "Distribution not in state, importing..."
+              terraform import -no-color -input=false 'aws_cloudfront_distribution.portfolio_distribution[0]' "$DIST_ID" || true
+            else
+              echo "Distribution already imported to state."
+            fi
+          else
+            echo "No existing Distribution found; will be created."
+          fi
+
+      - name: Re-plan for safety
+        working-directory: infra/terraform
+        run: |
+          if [ -f "${VAR_FILE}" ]; then
+            terraform plan -var-file="${VAR_FILE}" -out=tfplan
+          else
+            terraform plan -out=tfplan
+          fi
+        env:
+          TF_VAR_bucket_name: ${{ env.BASE_BUCKET }}
+          TF_VAR_environment: ${{ env.ENV_SLUG }}
+          TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_create_iam_resources: true
+          TF_VAR_use_oidc: true
+          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || '' }}
+          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '[]' }}
+          TF_VAR_create_ssl_certificate: ${{ env.USE_CUSTOM_DOMAIN }}
+          TF_VAR_create_cloudfront_distribution: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}
+          TF_VAR_create_route53_records: ${{ vars.CREATE_ROUTE53_RECORDS || 'false' }}
+          TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID || '' }}
+          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}
 
       - name: Terraform Apply
         working-directory: infra/terraform
-        run: terraform apply -auto-approve tfplan # ✅ Apply the downloaded plan
+        run: |
+          echo "🚀 Starting Terraform Apply..."
+          if ! terraform apply -auto-approve tfplan; then
+            echo "❌ Terraform Apply failed!"
+            echo "📋 Current Terraform state:"
+            terraform state list || true
+            echo "🔍 Terraform show output:"  
+            terraform show || true
+            exit 1
+          fi
+          echo "✅ Terraform Apply completed successfully!"
 
       - name: Display infrastructure info
-        # This step remains the same
         working-directory: infra/terraform
         run: |
           echo "🏗️ Infrastructure deployment successful!"
-          echo "🌍 Environment: ${{ github.event.inputs.environment || 'Production' }}"
+          echo "🌍 Environment: ${{ inputs.environment || github.event.inputs.environment || 'Production' }}"
           echo "S3 Bucket: $(terraform output -raw s3_bucket_name)"
           echo "Website URL: $(terraform output -raw website_url)"
           echo "📝 Note: Application code needs to be deployed separately."
@@ -190,6 +463,7 @@ jobs:
   # Summary job that always runs to provide consistent status for dependent workflows
   infra-complete:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || github.event.inputs.environment || 'Production' }}
     needs: [common-env, ci, check-changes, terraform-plan, deploy-infrastructure]
     if: always()
     outputs:
@@ -214,34 +488,52 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ needs.common-env.outputs.aws_region }}
 
+      - name: Set environment slug
+        id: set-env
+        shell: bash
+        run: |
+          if [ -n "${{ vars.STAGE }}" ]; then
+            ENV_SLUG_VAL='${{ vars.STAGE }}'
+          elif [ -n "${STAGE}" ]; then
+            ENV_SLUG_VAL="${STAGE}"
+          else
+            ENV_INPUT="${{ inputs.environment || github.event.inputs.environment || 'Production' }}"
+            if [ "$ENV_INPUT" = "Production" ]; then
+              ENV_SLUG_VAL="prod"
+            else
+              ENV_SLUG_VAL="dev"
+            fi
+          fi
+          echo "ENV_SLUG=$ENV_SLUG_VAL" >> "$GITHUB_ENV"
+          echo "Using ENV_SLUG=$ENV_SLUG_VAL"
+
       - name: Terraform Init and Get Outputs (with fallbacks)
         id: get-outputs
         working-directory: infra/terraform
         shell: bash
         run: |
           set -euo pipefail
-          ENVIRONMENT_NAME=${{ github.event.inputs.environment || 'Production' }}
           REGION=${{ needs.common-env.outputs.aws_region }}
 
-          # Fallbacks from repo/environment vars
-          FALLBACK_BUCKET="${{ vars.S3_BUCKET_NAME }}"
+          # Resolve base bucket (strip stage suffix if present)
+          BASE="${{ vars.S3_BUCKET_NAME }}"
+          if [[ "$BASE" == *"-${ENV_SLUG}" ]]; then
+            BASE="${BASE%-${ENV_SLUG}}"
+          fi
+          FALLBACK_BUCKET="${BASE}-${ENV_SLUG}"
           FALLBACK_URL="http://${FALLBACK_BUCKET}.s3-website-${REGION}.amazonaws.com"
 
           # Try to init Terraform to read from state (may fail if bucket/state not created)
           if terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate" \
-            -backend-config="region=${REGION}" >/dev/null; then
-            S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || true)
-            WEBSITE_URL=$(terraform output -raw website_url 2>/dev/null || true)
+            -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
+            -backend-config="region=${REGION}" >/dev/null 2>&1; then
+            S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "$FALLBACK_BUCKET")
+            WEBSITE_URL=$(terraform output -raw website_url 2>/dev/null || echo "$FALLBACK_URL")
           else
-            S3_BUCKET_NAME=""
-            WEBSITE_URL=""
+            S3_BUCKET_NAME="$FALLBACK_BUCKET"
+            WEBSITE_URL="$FALLBACK_URL"
           fi
-
-          # Apply fallbacks if outputs are empty
-          S3_BUCKET_NAME="${S3_BUCKET_NAME:-$FALLBACK_BUCKET}"
-          WEBSITE_URL="${WEBSITE_URL:-$FALLBACK_URL}"
 
           echo "s3-bucket-name=${S3_BUCKET_NAME}" >> "$GITHUB_OUTPUT"
           echo "website-url=${WEBSITE_URL}" >> "$GITHUB_OUTPUT"
