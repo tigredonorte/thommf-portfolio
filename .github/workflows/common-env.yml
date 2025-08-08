@@ -1,0 +1,31 @@
+name: Common Env
+
+on:
+  workflow_call:
+    outputs:
+      aws_region:
+        description: "AWS region"
+        value: ${{ jobs.set.outputs.aws_region }}
+      terraform_version:
+        description: "Terraform version"
+        value: ${{ jobs.set.outputs.terraform_version }}
+      deploy_on_pr:
+        description: "Allow deploys on PRs"
+        value: ${{ jobs.set.outputs.deploy_on_pr }}
+
+permissions: {}
+
+jobs:
+  set:
+    runs-on: ubuntu-latest
+    outputs:
+      aws_region: ${{ steps.out.outputs.aws_region }}
+      terraform_version: ${{ steps.out.outputs.terraform_version }}
+      deploy_on_pr: ${{ steps.out.outputs.deploy_on_pr }}
+    steps:
+      - id: out
+        shell: bash
+        run: |
+          echo "aws_region=${{ vars.AWS_REGION || 'us-east-1' }}" >> "$GITHUB_OUTPUT"
+          echo "deploy_on_pr=${{ vars.DEPLOY_ON_PR || 'false' }}" >> "$GITHUB_OUTPUT"
+          echo "terraform_version=${{ vars.TERRAFORM_VERSION || '1.7.0' }}" >> "$GITHUB_OUTPUT"
