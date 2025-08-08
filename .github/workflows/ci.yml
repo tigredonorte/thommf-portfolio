@@ -51,8 +51,41 @@ jobs:
       - name: Build affected projects
         run: npx nx affected -t build
 
-  e2e:
+  discover-e2e:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: set-matrix
+        name: Discover e2e projects
+        shell: bash
+        run: |
+          set -euo pipefail
+          dirs=$(ls -d apps/*-e2e 2>/dev/null || true)
+          if [ -z "${dirs}" ]; then
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          json="["
+          for d in $dirs; do
+            p=${d#apps/}
+            json="$json{\"dir\":\"$d\",\"project\":\"$p\"},"
+          done
+          json="${json%,}]"
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+
+  e2e:
+    needs: discover-e2e
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        e2e: ${{ fromJSON(needs.discover-e2e.outputs.matrix) }}
+    name: e2e-${{ matrix.e2e.project }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,3 +105,4 @@ jobs:
         env:
           CI: true
           PLAYWRIGHT_BROWSERS_PATH: 0
+          NX_PROJECT: ${{ matrix.e2e.project }}
