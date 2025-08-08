@@ -15,4 +15,4 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY . .
 
-CMD ["sh", "-c", "npx wait-on $APP_URL && pnpm e2e"]
+CMD ["sh", "-c", "npx wait-on $APP_URL && if [ -n \"$NX_PROJECT\" ]; then npx nx e2e \"$NX_PROJECT\"; else pnpm e2e; fi"]
