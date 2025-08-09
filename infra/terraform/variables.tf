@@ -77,3 +77,28 @@ variable "subdomain_names" {
     error_message = "All subdomain names must be valid domain names."
   }
 }
+
+variable "hosted_zone_id" {
+  description = "Route 53 hosted zone ID. If provided, will be used instead of looking up by domain name."
+  type        = string
+  default     = ""
+}
+
+# SSL Certificate and CloudFront Configuration
+variable "create_ssl_certificate" {
+  description = "Whether to create an SSL certificate for the domain"
+  type        = bool
+  default     = true
+}
+
+variable "create_cloudfront_distribution" {
+  description = "Whether to create a CloudFront distribution"
+  type        = bool
+  default     = true
+}
+
+variable "create_route53_records" {
+  description = "Whether to create Route53 records pointing to CloudFront"
+  type        = bool
+  default     = false
+}

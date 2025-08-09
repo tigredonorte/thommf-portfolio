@@ -38,22 +38,22 @@ output "ssl_certificate_status" {
 # CloudFront Outputs
 output "cloudfront_distribution_id" {
   description = "ID of the CloudFront distribution"
-  value       = aws_cloudfront_distribution.portfolio_distribution.id
+  value       = var.create_cloudfront_distribution ? aws_cloudfront_distribution.portfolio_distribution[0].id : null
 }
 
 output "cloudfront_distribution_arn" {
   description = "ARN of the CloudFront distribution"
-  value       = aws_cloudfront_distribution.portfolio_distribution.arn
+  value       = var.create_cloudfront_distribution ? aws_cloudfront_distribution.portfolio_distribution[0].arn : null
 }
 
 output "cloudfront_domain_name" {
   description = "Domain name of the CloudFront distribution"
-  value       = aws_cloudfront_distribution.portfolio_distribution.domain_name
+  value       = var.create_cloudfront_distribution ? aws_cloudfront_distribution.portfolio_distribution[0].domain_name : null
 }
 
 output "cloudfront_hosted_zone_id" {
   description = "Hosted zone ID of the CloudFront distribution"
-  value       = aws_cloudfront_distribution.portfolio_distribution.hosted_zone_id
+  value       = var.create_cloudfront_distribution ? aws_cloudfront_distribution.portfolio_distribution[0].hosted_zone_id : null
 }
 
 # Route 53 Outputs
@@ -64,7 +64,9 @@ output "route53_zone_id" {
 
 output "route53_name_servers" {
   description = "Name servers for the Route 53 hosted zone"
-  value       = var.create_shared_resources ? aws_route53_zone.main[0].name_servers : data.aws_route53_zone.main[0].name_servers
+  value = var.create_shared_resources ? aws_route53_zone.main[0].name_servers : (
+    var.hosted_zone_id != "" ? data.aws_route53_zone.main_by_id[0].name_servers : data.aws_route53_zone.main_by_name[0].name_servers
+  )
 }
 
 output "domain_name" {
@@ -86,5 +88,5 @@ output "www_website_url" {
 # CloudFront invalidation command
 output "cloudfront_invalidation_command" {
   description = "AWS CLI command to invalidate CloudFront cache"
-  value       = "aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.portfolio_distribution.id} --paths '/*'"
+  value       = var.create_cloudfront_distribution ? "aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.portfolio_distribution[0].id} --paths '/*'" : null
 }
