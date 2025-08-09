@@ -9,7 +9,7 @@ variable "create_shared_resources" {
 data "aws_route53_zone" "main" {
   count        = var.create_shared_resources ? 0 : 1
   name         = var.domain_name
-  private_zone = false  # We want the public zone
+  private_zone = false # We want the public zone
 }
 
 # Create Route53 zone if it doesn't exist (only in prod)
@@ -26,11 +26,11 @@ resource "aws_route53_zone" "main" {
 
 # Try to fetch existing ACM certificate
 data "aws_acm_certificate" "portfolio_cert" {
-  count    = var.create_shared_resources ? 0 : 1
-  provider = aws.us_east_1
-  domain   = var.domain_name
-  statuses = ["ISSUED"]
-  types    = ["AMAZON_ISSUED"]
+  count       = var.create_shared_resources ? 0 : 1
+  provider    = aws.us_east_1
+  domain      = var.domain_name
+  statuses    = ["ISSUED"]
+  types       = ["AMAZON_ISSUED"]
   most_recent = true
 }
 
@@ -38,9 +38,9 @@ data "aws_acm_certificate" "portfolio_cert" {
 resource "aws_acm_certificate" "portfolio_cert" {
   count                     = var.create_shared_resources ? 1 : 0
   provider                  = aws.us_east_1
-  domain_name              = var.domain_name
+  domain_name               = var.domain_name
   subject_alternative_names = local.all_subdomains
-  validation_method        = "DNS"
+  validation_method         = "DNS"
 
   lifecycle {
     create_before_destroy = true
