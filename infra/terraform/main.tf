@@ -92,6 +92,8 @@ resource "aws_cloudfront_origin_access_control" "portfolio_oac" {
 # CloudFront Distribution
 # ============================
 resource "aws_cloudfront_distribution" "portfolio_distribution" {
+  count = var.create_cloudfront_distribution ? 1 : 0
+
   origin {
     domain_name              = aws_s3_bucket.portfolio_bucket.bucket_regional_domain_name
     origin_access_control_id = aws_cloudfront_origin_access_control.portfolio_oac.id
@@ -163,6 +165,7 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
 # S3 Bucket Policy for CloudFront OAC
 # ============================
 resource "aws_s3_bucket_policy" "portfolio_bucket_policy_cloudfront" {
+  count  = var.create_cloudfront_distribution ? 1 : 0
   bucket = aws_s3_bucket.portfolio_bucket.id
 
   policy = jsonencode({
@@ -178,7 +181,7 @@ resource "aws_s3_bucket_policy" "portfolio_bucket_policy_cloudfront" {
         Resource = "${aws_s3_bucket.portfolio_bucket.arn}/*"
         Condition = {
           StringEquals = {
-            "AWS:SourceArn" = aws_cloudfront_distribution.portfolio_distribution.arn
+            "AWS:SourceArn" = aws_cloudfront_distribution.portfolio_distribution[0].arn
           }
         }
       }
@@ -190,27 +193,28 @@ resource "aws_s3_bucket_policy" "portfolio_bucket_policy_cloudfront" {
 # DNS Records (Root + Subdomains)
 # ============================
 resource "aws_route53_record" "portfolio_apex" {
+  count   = var.create_route53_records ? 1 : 0
   zone_id = local.route53_zone_id
   name    = var.domain_name
   type    = "A"
 
   alias {
-    name                   = aws_cloudfront_distribution.portfolio_distribution.domain_name
-    zone_id                = aws_cloudfront_distribution.portfolio_distribution.hosted_zone_id
+    name                   = aws_cloudfront_distribution.portfolio_distribution[0].domain_name
+    zone_id                = aws_cloudfront_distribution.portfolio_distribution[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
 
 resource "aws_route53_record" "portfolio_subdomains" {
-  for_each = toset(local.all_subdomains)
+  for_each = var.create_route53_records ? toset(local.all_subdomains) : toset([])
 
   zone_id = local.route53_zone_id
   name    = each.key
   type    = "A"
 
   alias {
-    name                   = aws_cloudfront_distribution.portfolio_distribution.domain_name
-    zone_id                = aws_cloudfront_distribution.portfolio_distribution.hosted_zone_id
+    name                   = aws_cloudfront_distribution.portfolio_distribution[0].domain_name
+    zone_id                = aws_cloudfront_distribution.portfolio_distribution[0].hosted_zone_id
     evaluate_target_health = false
   }
 }
