@@ -5,15 +5,15 @@ variable "create_shared_resources" {
   default     = false
 }
 
-# Try to fetch existing Route53 zone by ID if provided
+# Try to fetch existing Route53 zone by ID if provided (only when we actually need Route53 records)
 data "aws_route53_zone" "main_by_id" {
-  count   = !var.create_shared_resources && var.hosted_zone_id != "" ? 1 : 0
+  count   = var.create_route53_records && !var.create_shared_resources && var.hosted_zone_id != "" ? 1 : 0
   zone_id = var.hosted_zone_id
 }
 
-# Try to fetch existing Route53 zone by name if ID not provided
+# Try to fetch existing Route53 zone by name if ID not provided (only when we actually need Route53 records)
 data "aws_route53_zone" "main_by_name" {
-  count        = !var.create_shared_resources && var.hosted_zone_id == "" ? 1 : 0
+  count        = var.create_route53_records && !var.create_shared_resources && var.hosted_zone_id == "" ? 1 : 0
   name         = var.domain_name
   private_zone = false # We want the public zone
 }
@@ -86,9 +86,11 @@ resource "aws_acm_certificate_validation" "portfolio_cert_validation" {
 
 # Local values to help reference the correct resource
 locals {
-  # For Route53 zone ID, prioritize: created zone > zone by ID > zone by name
+  # For Route53 zone ID, prioritize: created zone > (only when creating records) zone by ID/name; else empty
   route53_zone_id = var.create_shared_resources ? aws_route53_zone.main[0].zone_id : (
-    var.hosted_zone_id != "" ? data.aws_route53_zone.main_by_id[0].zone_id : data.aws_route53_zone.main_by_name[0].zone_id
+    var.create_route53_records ? (
+      var.hosted_zone_id != "" ? data.aws_route53_zone.main_by_id[0].zone_id : data.aws_route53_zone.main_by_name[0].zone_id
+    ) : ""
   )
 
   acm_certificate_arn = var.create_shared_resources ? aws_acm_certificate.portfolio_cert[0].arn : data.aws_acm_certificate.portfolio_cert[0].arn
