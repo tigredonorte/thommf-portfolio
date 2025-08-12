@@ -81,7 +81,7 @@ resource "aws_s3_bucket_public_access_block" "portfolio_public_access_block" {
 # CloudFront Origin Access Control
 # ============================
 resource "aws_cloudfront_origin_access_control" "portfolio_oac" {
-  name                              = "portfolio-oac"
+  name                              = "portfolio-oac-${var.environment}"
   description                       = "OAC for Portfolio S3 bucket"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
