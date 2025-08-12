@@ -215,6 +215,17 @@ jobs:
           echo "VAR_FILE=terraform-${ENV_SLUG_VAL}.tfvars" >> "$GITHUB_ENV"
           echo "Using ENV_SLUG=$ENV_SLUG_VAL"
 
+      - name: Compute base bucket name
+        id: base-bucket
+        shell: bash
+        run: |
+          BASE="${{ vars.S3_BUCKET_NAME }}"
+          if [[ "$BASE" == *"-${ENV_SLUG}" ]]; then
+            BASE="${BASE%-${ENV_SLUG}}"
+          fi
+          echo "BASE_BUCKET=$BASE" >> "$GITHUB_ENV"
+          echo "Base bucket: $BASE"
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -240,12 +251,47 @@ jobs:
             -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
             -backend-config="region=${{ needs.common-env.outputs.aws_region }}"
 
+      - name: Import existing S3 bucket (idempotent)
+        working-directory: infra/terraform
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUCKET="${BASE_BUCKET}-${ENV_SLUG}"
+          echo "Checking for existing bucket: $BUCKET"
+          if aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then
+            echo "Bucket exists, attempting terraform import..."
+            terraform import -no-color aws_s3_bucket.portfolio_bucket "$BUCKET" || true
+          else
+            echo "Bucket does not exist or not accessible; skipping import."
+          fi
+
+      - name: Re-plan for safety
+        working-directory: infra/terraform
+        run: |
+          if [ -f "${VAR_FILE}" ]; then
+            terraform plan -var-file="${VAR_FILE}" -out=tfplan
+          else
+            terraform plan -out=tfplan
+          fi
+        env:
+          TF_VAR_bucket_name: ${{ env.BASE_BUCKET }}
+          TF_VAR_environment: ${{ env.ENV_SLUG }}
+          TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_create_iam_resources: true
+          TF_VAR_use_oidc: true
+          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}
+          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
+          TF_VAR_create_ssl_certificate: ${{ vars.CREATE_SSL_CERTIFICATE || 'true' }}
+          TF_VAR_create_cloudfront_distribution: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}
+          TF_VAR_create_route53_records: ${{ vars.CREATE_ROUTE53_RECORDS || 'false' }}
+          TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID || '' }}
+          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}
+
       - name: Terraform Apply
         working-directory: infra/terraform
-        run: terraform apply -auto-approve tfplan # ✅ Apply the downloaded plan
+        run: terraform apply -auto-approve tfplan
 
       - name: Display infrastructure info
-        # This step remains the same
         working-directory: infra/terraform
         run: |
           echo "🏗️ Infrastructure deployment successful!"
@@ -257,6 +303,7 @@ jobs:
   # Summary job that always runs to provide consistent status for dependent workflows
   infra-complete:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || github.event.inputs.environment || 'Production' }}
     needs: [common-env, ci, check-changes, terraform-plan, deploy-infrastructure]
     if: always()
     outputs:
