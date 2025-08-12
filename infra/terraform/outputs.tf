@@ -65,7 +65,9 @@ output "route53_zone_id" {
 output "route53_name_servers" {
   description = "Name servers for the Route 53 hosted zone"
   value = var.create_shared_resources ? aws_route53_zone.main[0].name_servers : (
-    var.hosted_zone_id != "" ? data.aws_route53_zone.main_by_id[0].name_servers : data.aws_route53_zone.main_by_name[0].name_servers
+    var.create_route53_records ? (
+      var.hosted_zone_id != "" ? data.aws_route53_zone.main_by_id[0].name_servers : data.aws_route53_zone.main_by_name[0].name_servers
+    ) : []
   )
 }
 
