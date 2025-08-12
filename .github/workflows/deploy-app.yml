@@ -12,7 +12,6 @@ on:
       - 'nx.json'
       - 'tsconfig*.json'
       - '.github/workflows/**'
-      - 'infra/**'
   workflow_run:
     workflows: ["Deploy Infrastructure"]
     types: [completed]
@@ -43,6 +42,9 @@ jobs:
     if: |
       (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && github.ref == 'refs/heads/main'))
     uses: ./.github/workflows/deploy-infra.yml
+    with:
+      environment: ${{ github.event.inputs.environment || 'Production' }}
+      dry_run: false
     secrets: inherit
 
   # Deploy the application to S3
@@ -54,6 +56,26 @@ jobs:
       needs.infrastructure.result == 'success' &&
       (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && github.ref == 'refs/heads/main'))
     steps:
+      - name: Set environment slug
+        id: set-env
+        shell: bash
+        run: |
+          # Prefer explicit STAGE variable (repo/environment var) when provided
+          if [ -n "${{ vars.STAGE }}" ]; then
+            ENV_SLUG_VAL='${{ vars.STAGE }}'
+          elif [ -n "${STAGE}" ]; then
+            ENV_SLUG_VAL="${STAGE}"
+          else
+            ENV_INPUT="${{ github.event.inputs.environment || 'Production' }}"
+            if [ "$ENV_INPUT" = "Production" ]; then
+              ENV_SLUG_VAL="prod"
+            else
+              ENV_SLUG_VAL="dev"
+            fi
+          fi
+          echo "ENV_SLUG=$ENV_SLUG_VAL" >> "$GITHUB_ENV"
+          echo "Using ENV_SLUG=$ENV_SLUG_VAL"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -73,26 +95,21 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ needs.common-env.outputs.aws_region }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ needs.common-env.outputs.terraform_version }}
-          terraform_wrapper: false
-
       - name: Sync files to S3
         run: |
-          # Get the bucket name from infrastructure job outputs or fallback to variable
+          # Get the bucket name from infrastructure job outputs or fallback to variable with env suffix
           BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
           if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
+            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${ENV_SLUG}"
           fi
-          
           echo "📦 Using S3 bucket: $BUCKET_NAME"
-          
-          # Sync container app files to root
+
+          # Sync container app files to root with metadata for caching
           echo "Syncing container app to root..."
-          aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete
-          
+          aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete --cache-control "public, max-age=60" --content-type "text/html" --exclude "*" --include "index.html" --include "404.html" || true
+          # Static assets with long cache
+          aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete --exclude "index.html" --exclude "404.html" --cache-control "public, max-age=31536000, immutable"
+
           # Sync all micro-frontend apps to their respective subdirectories
           for app_dir in apps/*/; do
             app_name=$(basename "$app_dir")
@@ -100,30 +117,20 @@ jobs:
             if [[ "$app_name" != "container" && "$app_name" != *"-e2e" ]]; then
               if [[ -d "apps/$app_name/dist" ]]; then
                 echo "Syncing $app_name micro-frontend..."
-                aws s3 sync "apps/$app_name/dist/" "s3://$BUCKET_NAME/$app_name/"
+                aws s3 sync "apps/$app_name/dist/" "s3://$BUCKET_NAME/$app_name/" --cache-control "public, max-age=31536000, immutable"
               fi
             fi
           done
 
       - name: Invalidate CloudFront Cache
         run: |
-          # Check if CloudFront distribution exists by trying to get outputs from infrastructure
           echo "🔄 Checking for CloudFront distribution..."
-          
-          # Try to get CloudFront distribution ID from Terraform outputs
-          # We'll need to set up the Terraform environment to get outputs
           cd infra/terraform
-          
-          # Initialize Terraform to read state
-          ENVIRONMENT_NAME=${{ github.event.inputs.environment || 'Production' }}
           terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate" \
-            -backend-config="region=${{ needs.common-env.outputs.aws_region }}"
-          
-          # Get CloudFront distribution ID if it exists
+            -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
+            -backend-config="region=${{ needs.common-env.outputs.aws_region }}" >/dev/null 2>&1 || true
           DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "")
-          
           if [ ! -z "$DISTRIBUTION_ID" ] && [ "$DISTRIBUTION_ID" != "null" ]; then
             echo "☁️ Found CloudFront distribution: $DISTRIBUTION_ID"
             echo "🔄 Creating CloudFront invalidation..."
@@ -133,33 +140,18 @@ jobs:
               --query 'Invalidation.Id' \
               --output text)
             echo "✅ CloudFront invalidation created: $INVALIDATION_ID"
-            echo "⏳ Invalidation may take 5-15 minutes to complete"
           else
             echo "ℹ️ No CloudFront distribution found - skipping cache invalidation"
           fi
-        env:
-          TF_VAR_bucket_name: ${{ vars.S3_BUCKET_NAME }}
-          TF_VAR_environment: ${{ github.event.inputs.environment || 'Production' }}
-          TF_VAR_github_repository: ${{ github.repository }}
-          TF_VAR_create_iam_resources: true
-          TF_VAR_use_oidc: true
-          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}
-          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
-          TF_VAR_create_ssl_certificate: false
-          TF_VAR_create_cloudfront_distribution: true
-          TF_VAR_create_route53_records: false
-          TF_VAR_hosted_zone_id: "Z098636713KLW0EP54JNB"
-          TF_VAR_create_shared_resources: false
 
       - name: Get website URL
         id: get-url
         run: |
-          # Use URL from infrastructure outputs or construct from bucket name
           WEBSITE_URL="${{ needs.infrastructure.outputs.website-url }}"
           if [ -z "$WEBSITE_URL" ]; then
             BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
             if [ -z "$BUCKET_NAME" ]; then
-              BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
+              BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${ENV_SLUG}"
             fi
             WEBSITE_URL="http://$BUCKET_NAME.s3-website-${{ needs.common-env.outputs.aws_region }}.amazonaws.com"
           fi
@@ -171,29 +163,20 @@ jobs:
           echo "🌍 Environment: ${{ github.event.inputs.environment || 'Production' }}"
           BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
           if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}"
+            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${ENV_SLUG}"
           fi
           echo "📦 App files synced to S3 bucket: $BUCKET_NAME"
-          
-          # Show both S3 website URL and custom domain URLs
           echo "🌐 S3 Website URL: ${{ steps.get-url.outputs.website-url }}"
-          
-          # Try to get custom domain URLs from Terraform outputs
           cd infra/terraform
-          ENVIRONMENT_NAME=${{ github.event.inputs.environment || 'Production' }}
-          terraform init -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" -backend-config="key=portfolio/${ENVIRONMENT_NAME,,}/terraform.tfstate" -backend-config="region=${{ needs.common-env.outputs.aws_region }}" > /dev/null 2>&1
-          
+          terraform init -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" -backend-config="region=${{ needs.common-env.outputs.aws_region }}" > /dev/null 2>&1 || true
           HTTPS_URL=$(terraform output -raw https_website_url 2>/dev/null || echo "")
           WWW_URL=$(terraform output -raw www_website_url 2>/dev/null || echo "")
-          
           if [ ! -z "$HTTPS_URL" ] && [ "$HTTPS_URL" != "null" ]; then
             echo "🔒 Custom Domain: $HTTPS_URL"
           fi
           if [ ! -z "$WWW_URL" ] && [ "$WWW_URL" != "null" ]; then
             echo "🔒 WWW Domain: $WWW_URL"
           fi
-          
-          # Show CloudFront distribution URL if available
           CLOUDFRONT_DOMAIN=$(terraform output -raw cloudfront_domain_name 2>/dev/null || echo "")
           if [ ! -z "$CLOUDFRONT_DOMAIN" ] && [ "$CLOUDFRONT_DOMAIN" != "null" ]; then
             echo "☁️ CloudFront URL: https://$CLOUDFRONT_DOMAIN"
