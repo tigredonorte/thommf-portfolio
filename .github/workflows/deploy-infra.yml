@@ -183,6 +183,7 @@ jobs:
 
   deploy-infrastructure:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: [common-env, ci, terraform-plan, check-changes]
     if: |
       needs.ci.result == 'success' &&
@@ -277,6 +278,59 @@ jobs:
             terraform import -no-color -input=false aws_s3_bucket.portfolio_bucket "$BUCKET" || true
           else
             echo "Bucket does not exist or not accessible; skipping import."
+          fi
+
+      - name: Import existing CloudFront OAC (idempotent)
+        working-directory: infra/terraform
+        shell: bash
+        env:
+          TF_INPUT: "false"
+        run: |
+          set -euo pipefail
+          OAC_NAME="portfolio-oac-${ENV_SLUG}"
+          echo "Checking for existing CloudFront OAC: $OAC_NAME"
+          OAC_ID=$(aws cloudfront list-origin-access-controls --query "OriginAccessControlList.Items[?Name=='${OAC_NAME}'].Id" --output text 2>/dev/null || true)
+          if [ -n "$OAC_ID" ] && [ "$OAC_ID" != "None" ]; then
+            echo "Found OAC ID: $OAC_ID. Importing..."
+            terraform import -no-color -input=false aws_cloudfront_origin_access_control.portfolio_oac "$OAC_ID" || true
+          else
+            echo "No existing OAC found; skipping import."
+          fi
+
+      - name: Import existing CloudFront Distribution (idempotent)
+        working-directory: infra/terraform
+        shell: bash
+        env:
+          TF_INPUT: "false"
+          DOMAIN_NAME: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}
+          SUBDOMAIN_NAMES: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
+        run: |
+          set -euo pipefail
+          echo "Preparing alias candidates from DOMAIN_NAME and SUBDOMAIN_NAMES..."
+          ALIASES=("${DOMAIN_NAME}")
+          # Parse JSON-ish SUBDOMAIN_NAMES -> space separated
+          SUBS=$(echo "$SUBDOMAIN_NAMES" | tr -d '[]"' | tr ',' ' ')
+          for a in $SUBS; do
+            [ -n "$a" ] && ALIASES+=("$a")
+          done
+          if [ "$ENV_SLUG" != "prod" ]; then
+            ALIASES+=("${ENV_SLUG}.${DOMAIN_NAME}")
+          fi
+
+          echo "Searching existing CloudFront distributions by aliases: ${ALIASES[*]}"
+          DIST_ID=""
+          for alias in "${ALIASES[@]}"; do
+            CAND=$(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases!=null && Aliases.Items!=null && contains(Aliases.Items, '${alias}')].Id | [0]" --output text 2>/dev/null || true)
+            if [ -n "$CAND" ] && [ "$CAND" != "None" ]; then
+              DIST_ID="$CAND"; break
+            fi
+          done
+
+          if [ -n "$DIST_ID" ]; then
+            echo "Found Distribution ID: $DIST_ID for alias; importing..."
+            terraform import -no-color -input=false aws_cloudfront_distribution.portfolio_distribution[0] "$DIST_ID" || true
+          else
+            echo "No existing Distribution found; skipping import."
           fi
 
       - name: Re-plan for safety
