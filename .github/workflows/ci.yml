@@ -60,6 +60,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - id: set-matrix
         name: Discover e2e projects
         shell: bash
@@ -95,10 +96,13 @@ jobs:
       - name: Setup Node.js and pnpm
         uses: ./.github/actions/setup-node-pnpm
 
-      - name: Enable Docker BuildKit
-        run: |
-          echo '{"features":{"buildkit":true}}' | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
 
       - name: E2E
         run: pnpm e2e:docker
@@ -106,3 +110,5 @@ jobs:
           CI: true
           PLAYWRIGHT_BROWSERS_PATH: 0
           NX_PROJECT: ${{ matrix.e2e.project }}
+          DOCKER_BUILDKIT: 1
+          COMPOSE_DOCKER_CLI_BUILD: 1

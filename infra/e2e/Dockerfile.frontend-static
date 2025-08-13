@@ -11,14 +11,13 @@ RUN npm install -g pnpm@latest
 
 COPY package.json pnpm-lock.yaml ./
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY . .
 
-RUN npx nx sync
-
-ENV NX_DAEMON=false
-RUN npx nx run-many --target=build --all --exclude="*-e2e"
+# Combine nx sync and build to reduce layers and speed up build
+RUN npx nx sync && \
+    NX_DAEMON=false npx nx run-many --target=build --all --exclude="*-e2e" --parallel=4
 
 # 3. Production stage with Nginx
 FROM base AS final

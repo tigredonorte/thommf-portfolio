@@ -18,14 +18,17 @@ export default defineConfig({
 
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
-  timeout: 5000,
-  reporter: 'html',
-  workers: process.env.CI ? 2 : undefined,
+  timeout: 3000,
+  reporter: process.env.CI ? 'github' : 'html',
+  workers: process.env.CI ? 4 : undefined,
   use: {
     baseURL,
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* Collect trace only on failure in CI */
+    trace: process.env.CI ? 'retain-on-failure' : 'on-first-retry',
     ignoreHTTPSErrors: true,
+    /* Reduce wait times */
+    actionTimeout: 2000,
+    navigationTimeout: 5000,
   },
   /* Run your local dev server before starting the tests */
   // webServer: {
@@ -34,7 +37,12 @@ export default defineConfig({
   //   reuseExistingServer: true,
   //   cwd: workspaceRoot,
   // },
-  projects: [
+  projects: process.env.CI ? [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ] : [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
@@ -44,8 +52,9 @@ export default defineConfig({
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
     },
+  ],
 
-    // Uncomment for mobile browsers support
+    // Uncomment for mobile browsers support in local development
     /* {
       name: 'Mobile Chrome',
       use: { ...devices['Pixel 5'] },
@@ -64,5 +73,4 @@ export default defineConfig({
       name: 'Google Chrome',
       use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     } */
-  ],
 });
