@@ -252,6 +252,15 @@ jobs:
             -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
             -backend-config="region=${{ needs.common-env.outputs.aws_region }}"
 
+      - name: Debug environment and variables
+        run: |
+          echo "🔍 Debug Info:"
+          echo "ENV_SLUG: ${ENV_SLUG}"
+          echo "BASE_BUCKET: ${BASE_BUCKET}"  
+          echo "Expected bucket name: ${BASE_BUCKET}-${ENV_SLUG}"
+          echo "TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'true' }}"
+          echo "DOMAIN_NAME: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}"
+
       - name: Import existing S3 bucket (idempotent)
         working-directory: infra/terraform
         shell: bash
@@ -271,6 +280,14 @@ jobs:
           TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'true' }}
         run: |
           set -euo pipefail
+          
+          # Skip imports if we're creating new shared resources (might conflict)
+          CREATE_SHARED="${{ vars.CREATE_SHARED_RESOURCES || 'true' }}"
+          if [ "$CREATE_SHARED" = "true" ]; then
+            echo "CREATE_SHARED_RESOURCES=true, skipping S3 bucket import to avoid conflicts"
+            exit 0
+          fi
+          
           BUCKET="${BASE_BUCKET}-${ENV_SLUG}"
           echo "Checking for existing bucket: $BUCKET"
           if aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then
@@ -292,6 +309,14 @@ jobs:
           TF_INPUT: "false"
         run: |
           set -euo pipefail
+          
+          # Skip imports if we're creating new shared resources (might conflict)
+          CREATE_SHARED="${{ vars.CREATE_SHARED_RESOURCES || 'true' }}"
+          if [ "$CREATE_SHARED" = "true" ]; then
+            echo "CREATE_SHARED_RESOURCES=true, skipping CloudFront OAC import to avoid conflicts"
+            exit 0
+          fi
+          
           OAC_NAME="portfolio-oac-${ENV_SLUG}"
           echo "Checking for existing CloudFront OAC: $OAC_NAME"
           OAC_ID=$(aws cloudfront list-origin-access-controls --query "OriginAccessControlList.Items[?Name=='${OAC_NAME}'].Id" --output text 2>/dev/null || true)
@@ -316,6 +341,14 @@ jobs:
           SUBDOMAIN_NAMES: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
         run: |
           set -euo pipefail
+          
+          # Skip imports if we're creating new shared resources (might conflict)
+          CREATE_SHARED="${{ vars.CREATE_SHARED_RESOURCES || 'true' }}"
+          if [ "$CREATE_SHARED" = "true" ]; then
+            echo "CREATE_SHARED_RESOURCES=true, skipping CloudFront Distribution import to avoid conflicts"
+            exit 0
+          fi
+          
           echo "Preparing alias candidates from DOMAIN_NAME and SUBDOMAIN_NAMES..."
           ALIASES=("${DOMAIN_NAME}")
           # Parse JSON-ish SUBDOMAIN_NAMES -> space separated
@@ -372,7 +405,17 @@ jobs:
 
       - name: Terraform Apply
         working-directory: infra/terraform
-        run: terraform apply -auto-approve tfplan
+        run: |
+          echo "🚀 Starting Terraform Apply..."
+          if ! terraform apply -auto-approve tfplan; then
+            echo "❌ Terraform Apply failed!"
+            echo "📋 Current Terraform state:"
+            terraform state list || true
+            echo "🔍 Terraform show output:"  
+            terraform show || true
+            exit 1
+          fi
+          echo "✅ Terraform Apply completed successfully!"
 
       - name: Display infrastructure info
         working-directory: infra/terraform
