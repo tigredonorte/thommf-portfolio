@@ -5,22 +5,26 @@ variable "create_shared_resources" {
   default     = false
 }
 
-# Try to fetch existing Route53 zone by ID if provided (only when we actually need Route53 records)
+# ============================
+# Route53 Zone Management
+# ============================
+
+# Try to fetch existing Route53 zone by ID if provided
 data "aws_route53_zone" "main_by_id" {
-  count   = var.create_route53_records && !var.create_shared_resources && var.hosted_zone_id != "" ? 1 : 0
+  count   = !var.create_shared_resources && var.hosted_zone_id != "" ? 1 : 0
   zone_id = var.hosted_zone_id
 }
 
-# Try to fetch existing Route53 zone by name if ID not provided (only when we actually need Route53 records)
+# Try to fetch existing Route53 zone by name if ID not provided
 data "aws_route53_zone" "main_by_name" {
-  count        = var.create_route53_records && !var.create_shared_resources && var.hosted_zone_id == "" ? 1 : 0
+  count        = !var.create_shared_resources && var.hosted_zone_id == "" && var.domain_name != "" ? 1 : 0
   name         = var.domain_name
-  private_zone = false # We want the public zone
+  private_zone = false
 }
 
-# Create Route53 zone if it doesn't exist (only in prod)
+# Create Route53 zone if it doesn't exist
 resource "aws_route53_zone" "main" {
-  count = var.create_shared_resources ? 1 : 0
+  count = var.create_shared_resources && var.domain_name != "" ? 1 : 0
   name  = var.domain_name
 
   tags = {
@@ -30,19 +34,23 @@ resource "aws_route53_zone" "main" {
   }
 }
 
+# ============================
+# ACM Certificate Management
+# ============================
+
 # Try to fetch existing ACM certificate
 data "aws_acm_certificate" "portfolio_cert" {
-  count       = var.create_shared_resources ? 0 : 1
-  provider    = aws.us_east_1
-  domain      = var.domain_name
-  statuses    = ["ISSUED"]
-  types       = ["AMAZON_ISSUED"]
+  count    = !var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? 1 : 0
+  provider = aws.us_east_1
+  domain   = var.domain_name
+  statuses = ["ISSUED"]
+  types    = ["AMAZON_ISSUED"]
   most_recent = true
 }
 
-# Create certificate if it doesn't exist (only in prod)
+# Create certificate if it doesn't exist
 resource "aws_acm_certificate" "portfolio_cert" {
-  count                     = var.create_shared_resources ? 1 : 0
+  count                     = var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? 1 : 0
   provider                  = aws.us_east_1
   domain_name               = var.domain_name
   subject_alternative_names = local.all_subdomains
@@ -59,10 +67,11 @@ resource "aws_acm_certificate" "portfolio_cert" {
   }
 }
 
-# DNS records for ACM validation (only when creating new certificate)
+# DNS records for ACM validation (only when creating new certificate AND have a zone)
 resource "aws_route53_record" "cert_validation" {
-  for_each = var.create_shared_resources ? {
+  for_each = var.create_shared_resources && var.create_ssl_certificate && local.route53_zone_id != "" ? {
     for dvo in aws_acm_certificate.portfolio_cert[0].domain_validation_options : dvo.domain_name => dvo
+    if dvo.resource_record_name != null
   } : {}
 
   zone_id = local.route53_zone_id
@@ -70,11 +79,15 @@ resource "aws_route53_record" "cert_validation" {
   type    = each.value.resource_record_type
   records = [each.value.resource_record_value]
   ttl     = 60
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
-# Certificate validation (only when creating new certificate)
+# Certificate validation (only when creating new certificate AND have validation records)
 resource "aws_acm_certificate_validation" "portfolio_cert_validation" {
-  count                   = var.create_shared_resources ? 1 : 0
+  count                   = var.create_shared_resources && var.create_ssl_certificate && local.route53_zone_id != "" ? 1 : 0
   provider                = aws.us_east_1
   certificate_arn         = aws_acm_certificate.portfolio_cert[0].arn
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
@@ -84,14 +97,31 @@ resource "aws_acm_certificate_validation" "portfolio_cert_validation" {
   }
 }
 
-# Local values to help reference the correct resource
+# ============================
+# Local values for easy reference
+# ============================
 locals {
-  # For Route53 zone ID, prioritize: created zone > (only when creating records) zone by ID/name; else empty
-  route53_zone_id = var.create_shared_resources ? aws_route53_zone.main[0].zone_id : (
-    var.create_route53_records ? (
-      var.hosted_zone_id != "" ? data.aws_route53_zone.main_by_id[0].zone_id : data.aws_route53_zone.main_by_name[0].zone_id
-    ) : ""
+  # Route53 Zone ID - prioritize created zone, then existing zone by ID, then by name
+  route53_zone_id = (
+    var.create_shared_resources && var.domain_name != "" ? (
+      length(aws_route53_zone.main) > 0 ? aws_route53_zone.main[0].zone_id : ""
+    ) : (
+      var.hosted_zone_id != "" ? (
+        length(data.aws_route53_zone.main_by_id) > 0 ? data.aws_route53_zone.main_by_id[0].zone_id : ""
+      ) : (
+        var.domain_name != "" && length(data.aws_route53_zone.main_by_name) > 0 ? data.aws_route53_zone.main_by_name[0].zone_id : ""
+      )
+    )
   )
 
-  acm_certificate_arn = var.create_shared_resources ? aws_acm_certificate.portfolio_cert[0].arn : data.aws_acm_certificate.portfolio_cert[0].arn
+  # ACM Certificate ARN - use created cert if available, otherwise use existing cert
+  acm_certificate_arn = (
+    var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? (
+      length(aws_acm_certificate.portfolio_cert) > 0 ? aws_acm_certificate.portfolio_cert[0].arn : ""
+    ) : (
+      !var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? (
+        length(data.aws_acm_certificate.portfolio_cert) > 0 ? data.aws_acm_certificate.portfolio_cert[0].arn : ""
+      ) : ""
+    )
+  )
 }

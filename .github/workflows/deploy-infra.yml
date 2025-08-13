@@ -152,6 +152,34 @@ jobs:
         working-directory: infra/terraform
         run: terraform validate
 
+      - name: Check ACM Certificate Status
+        id: check-cert
+        shell: bash
+        run: |
+          # Check if we should use a custom domain
+          USE_CUSTOM_DOMAIN="false"
+          if [ "${{ vars.CREATE_SSL_CERTIFICATE }}" = "true" ] && [ -n "${{ vars.DOMAIN_NAME }}" ]; then
+            USE_CUSTOM_DOMAIN="true"
+          fi
+          echo "USE_CUSTOM_DOMAIN=$USE_CUSTOM_DOMAIN" >> "$GITHUB_ENV"
+          
+          if [ "$USE_CUSTOM_DOMAIN" = "true" ]; then
+            echo "🔍 Checking for existing ACM certificate for ${{ vars.DOMAIN_NAME }}..."
+            CERT_ARN=$(aws acm list-certificates --region us-east-1 \
+              --query "CertificateSummaryList[?DomainName=='${{ vars.DOMAIN_NAME }}' && Status=='ISSUED'].CertificateArn | [0]" \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$CERT_ARN" ] && [ "$CERT_ARN" != "None" ]; then
+              echo "✅ Found valid certificate: $CERT_ARN"
+              echo "EXISTING_CERT_ARN=$CERT_ARN" >> "$GITHUB_ENV"
+            else
+              echo "⚠️ No valid certificate found for ${{ vars.DOMAIN_NAME }}"
+              echo "📝 Certificate will be created if create_shared_resources=true"
+            fi
+          else
+            echo "ℹ️ Not using custom domain - CloudFront will use default certificate"
+          fi
+
       - name: Terraform Plan
         working-directory: infra/terraform
         run: |
@@ -167,16 +195,16 @@ jobs:
           TF_VAR_github_repository: ${{ github.repository }}
           TF_VAR_create_iam_resources: true
           TF_VAR_use_oidc: true
-          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}
-          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
-          TF_VAR_create_ssl_certificate: ${{ vars.CREATE_SSL_CERTIFICATE || 'true' }}
+          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || '' }}
+          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '[]' }}
+          TF_VAR_create_ssl_certificate: ${{ env.USE_CUSTOM_DOMAIN }}
           TF_VAR_create_cloudfront_distribution: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}
           TF_VAR_create_route53_records: ${{ vars.CREATE_ROUTE53_RECORDS || 'false' }}
           TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID || '' }}
-          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'true' }}
+          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}
 
       - name: Upload Terraform Plan
-        uses: actions/upload-artifact@v4 # ✅ Upload the plan file
+        uses: actions/upload-artifact@v4
         with:
           name: terraform-plan
           path: infra/terraform/tfplan
@@ -258,8 +286,51 @@ jobs:
           echo "ENV_SLUG: ${ENV_SLUG}"
           echo "BASE_BUCKET: ${BASE_BUCKET}"  
           echo "Expected bucket name: ${BASE_BUCKET}-${ENV_SLUG}"
-          echo "TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'true' }}"
-          echo "DOMAIN_NAME: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}"
+          echo "CREATE_SHARED_RESOURCES: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}"
+          echo "CREATE_SSL_CERTIFICATE: ${{ vars.CREATE_SSL_CERTIFICATE || 'false' }}"
+          echo "DOMAIN_NAME: ${{ vars.DOMAIN_NAME || '(not set)' }}"
+          echo "CREATE_CLOUDFRONT_DISTRIBUTION: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}"
+
+      - name: Check ACM Certificate Status
+        id: check-cert
+        shell: bash
+        run: |
+          USE_CUSTOM_DOMAIN="false"
+          if [ "${{ vars.CREATE_SSL_CERTIFICATE }}" = "true" ] && [ -n "${{ vars.DOMAIN_NAME }}" ]; then
+            USE_CUSTOM_DOMAIN="true"
+          fi
+          echo "USE_CUSTOM_DOMAIN=$USE_CUSTOM_DOMAIN" >> "$GITHUB_ENV"
+
+      - name: Clean up conflicting CloudFront distributions
+        shell: bash
+        run: |
+          if [ "${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION }}" = "true" ] && [ "$USE_CUSTOM_DOMAIN" = "true" ]; then
+            echo "🔍 Checking for conflicting CloudFront distributions..."
+            DOMAIN="${{ vars.DOMAIN_NAME }}"
+            
+            # Find distributions using our domain as an alias
+            CONFLICTING_DIST=$(aws cloudfront list-distributions \
+              --query "DistributionList.Items[?contains(Aliases.Items || \`[]\`, '$DOMAIN')].Id | [0]" \
+              --output text 2>/dev/null || echo "")
+            
+            if [ -n "$CONFLICTING_DIST" ] && [ "$CONFLICTING_DIST" != "None" ]; then
+              echo "⚠️ Found conflicting distribution: $CONFLICTING_DIST"
+              # Check if this is our managed distribution
+              DIST_TAGS=$(aws cloudfront list-tags-for-resource \
+                --resource "arn:aws:cloudfront::$(aws sts get-caller-identity --query Account --output text):distribution/$CONFLICTING_DIST" \
+                --query "Tags.Items[?Key=='Environment'].Value | [0]" \
+                --output text 2>/dev/null || echo "")
+              
+              if [ "$DIST_TAGS" = "${{ vars.resource_tag_environment || 'frontend' }}" ]; then
+                echo "ℹ️ Distribution is managed by our Terraform - will be updated"
+              else
+                echo "❌ Distribution is not managed by our Terraform"
+                echo "Please manually remove the alias from distribution $CONFLICTING_DIST"
+              fi
+            else
+              echo "✅ No conflicting CloudFront distributions found"
+            fi
+          fi
 
       - name: Import existing S3 bucket (idempotent)
         working-directory: infra/terraform
@@ -271,22 +342,15 @@ jobs:
           TF_VAR_github_repository: ${{ github.repository }}
           TF_VAR_create_iam_resources: true
           TF_VAR_use_oidc: true
-          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}
-          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
-          TF_VAR_create_ssl_certificate: ${{ vars.CREATE_SSL_CERTIFICATE || 'true' }}
+          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || '' }}
+          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '[]' }}
+          TF_VAR_create_ssl_certificate: ${{ env.USE_CUSTOM_DOMAIN }}
           TF_VAR_create_cloudfront_distribution: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}
           TF_VAR_create_route53_records: ${{ vars.CREATE_ROUTE53_RECORDS || 'false' }}
           TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID || '' }}
-          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'true' }}
+          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}
         run: |
           set -euo pipefail
-          
-          # Skip imports if we're creating new shared resources (might conflict)
-          CREATE_SHARED="${{ vars.CREATE_SHARED_RESOURCES || 'true' }}"
-          if [ "$CREATE_SHARED" = "true" ]; then
-            echo "CREATE_SHARED_RESOURCES=true, skipping S3 bucket import to avoid conflicts"
-            exit 0
-          fi
           
           BUCKET="${BASE_BUCKET}-${ENV_SLUG}"
           echo "Checking for existing bucket: $BUCKET"
@@ -302,7 +366,7 @@ jobs:
             echo "Bucket does not exist or not accessible; skipping import."
           fi
 
-      - name: Import existing CloudFront OAC (idempotent)
+      - name: Import existing CloudFront resources (idempotent)
         working-directory: infra/terraform
         shell: bash
         env:
@@ -310,75 +374,45 @@ jobs:
         run: |
           set -euo pipefail
           
-          # Skip imports if we're creating new shared resources (might conflict)
-          CREATE_SHARED="${{ vars.CREATE_SHARED_RESOURCES || 'true' }}"
-          if [ "$CREATE_SHARED" = "true" ]; then
-            echo "CREATE_SHARED_RESOURCES=true, skipping CloudFront OAC import to avoid conflicts"
+          # Only import if we're managing CloudFront
+          if [ "${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION }}" != "true" ]; then
+            echo "CloudFront distribution management disabled, skipping imports"
             exit 0
           fi
           
+          # Import OAC if it exists
           OAC_NAME="portfolio-oac-${ENV_SLUG}"
           echo "Checking for existing CloudFront OAC: $OAC_NAME"
           OAC_ID=$(aws cloudfront list-origin-access-controls --query "OriginAccessControlList.Items[?Name=='${OAC_NAME}'].Id" --output text 2>/dev/null || true)
           if [ -n "$OAC_ID" ] && [ "$OAC_ID" != "None" ]; then
             echo "Found OAC ID: $OAC_ID. Checking if already imported..."
-            if ! terraform state show aws_cloudfront_origin_access_control.portfolio_oac >/dev/null 2>&1; then
+            if ! terraform state show aws_cloudfront_origin_access_control.portfolio_oac[0] >/dev/null 2>&1; then
               echo "OAC not in state, importing..."
-              terraform import -no-color -input=false aws_cloudfront_origin_access_control.portfolio_oac "$OAC_ID" || true
+              terraform import -no-color -input=false 'aws_cloudfront_origin_access_control.portfolio_oac[0]' "$OAC_ID" || true
             else
               echo "OAC already imported to state."
             fi
           else
-            echo "No existing OAC found; skipping import."
-          fi
-
-      - name: Import existing CloudFront Distribution (idempotent)
-        working-directory: infra/terraform
-        shell: bash
-        env:
-          TF_INPUT: "false"
-          DOMAIN_NAME: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}
-          SUBDOMAIN_NAMES: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
-        run: |
-          set -euo pipefail
-          
-          # Skip imports if we're creating new shared resources (might conflict)
-          CREATE_SHARED="${{ vars.CREATE_SHARED_RESOURCES || 'true' }}"
-          if [ "$CREATE_SHARED" = "true" ]; then
-            echo "CREATE_SHARED_RESOURCES=true, skipping CloudFront Distribution import to avoid conflicts"
-            exit 0
+            echo "No existing OAC found; will be created."
           fi
           
-          echo "Preparing alias candidates from DOMAIN_NAME and SUBDOMAIN_NAMES..."
-          ALIASES=("${DOMAIN_NAME}")
-          # Parse JSON-ish SUBDOMAIN_NAMES -> space separated
-          SUBS=$(echo "$SUBDOMAIN_NAMES" | tr -d '[]"' | tr ',' ' ')
-          for a in $SUBS; do
-            [ -n "$a" ] && ALIASES+=("$a")
-          done
-          if [ "$ENV_SLUG" != "prod" ]; then
-            ALIASES+=("${ENV_SLUG}.${DOMAIN_NAME}")
-          fi
-
-          echo "Searching existing CloudFront distributions by aliases: ${ALIASES[*]}"
-          DIST_ID=""
-          for alias in "${ALIASES[@]}"; do
-            CAND=$(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases!=null && Aliases.Items!=null && contains(Aliases.Items, '${alias}')].Id | [0]" --output text 2>/dev/null || true)
-            if [ -n "$CAND" ] && [ "$CAND" != "None" ]; then
-              DIST_ID="$CAND"; break
-            fi
-          done
-
-          if [ -n "$DIST_ID" ]; then
+          # Import CloudFront distribution if it exists
+          BUCKET="${BASE_BUCKET}-${ENV_SLUG}"
+          echo "Checking for existing CloudFront distribution with origin: $BUCKET"
+          DIST_ID=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Origins.Items[*].DomainName, '${BUCKET}')].Id | [0]" \
+            --output text 2>/dev/null || true)
+          
+          if [ -n "$DIST_ID" ] && [ "$DIST_ID" != "None" ]; then
             echo "Found Distribution ID: $DIST_ID. Checking if already imported..."
-            if ! terraform state show aws_cloudfront_distribution.portfolio_distribution[0] >/dev/null 2>&1; then
+            if ! terraform state show 'aws_cloudfront_distribution.portfolio_distribution[0]' >/dev/null 2>&1; then
               echo "Distribution not in state, importing..."
-              terraform import -no-color -input=false aws_cloudfront_distribution.portfolio_distribution[0] "$DIST_ID" || true
+              terraform import -no-color -input=false 'aws_cloudfront_distribution.portfolio_distribution[0]' "$DIST_ID" || true
             else
               echo "Distribution already imported to state."
             fi
           else
-            echo "No existing Distribution found; skipping import."
+            echo "No existing Distribution found; will be created."
           fi
 
       - name: Re-plan for safety
@@ -395,13 +429,13 @@ jobs:
           TF_VAR_github_repository: ${{ github.repository }}
           TF_VAR_create_iam_resources: true
           TF_VAR_use_oidc: true
-          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || 'thomfilg.com' }}
-          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '["www.thomfilg.com"]' }}
-          TF_VAR_create_ssl_certificate: ${{ vars.CREATE_SSL_CERTIFICATE || 'true' }}
+          TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || '' }}
+          TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '[]' }}
+          TF_VAR_create_ssl_certificate: ${{ env.USE_CUSTOM_DOMAIN }}
           TF_VAR_create_cloudfront_distribution: ${{ vars.CREATE_CLOUDFRONT_DISTRIBUTION || 'true' }}
           TF_VAR_create_route53_records: ${{ vars.CREATE_ROUTE53_RECORDS || 'false' }}
           TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID || '' }}
-          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'true' }}
+          TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}
 
       - name: Terraform Apply
         working-directory: infra/terraform
@@ -493,17 +527,13 @@ jobs:
           if terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
             -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
-            -backend-config="region=${REGION}" >/dev/null; then
-            S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || true)
-            WEBSITE_URL=$(terraform output -raw website_url 2>/dev/null || true)
+            -backend-config="region=${REGION}" >/dev/null 2>&1; then
+            S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "$FALLBACK_BUCKET")
+            WEBSITE_URL=$(terraform output -raw website_url 2>/dev/null || echo "$FALLBACK_URL")
           else
-            S3_BUCKET_NAME=""
-            WEBSITE_URL=""
+            S3_BUCKET_NAME="$FALLBACK_BUCKET"
+            WEBSITE_URL="$FALLBACK_URL"
           fi
-
-          # Apply fallbacks if outputs are empty
-          S3_BUCKET_NAME="${S3_BUCKET_NAME:-$FALLBACK_BUCKET}"
-          WEBSITE_URL="${WEBSITE_URL:-$FALLBACK_URL}"
 
           echo "s3-bucket-name=${S3_BUCKET_NAME}" >> "$GITHUB_OUTPUT"
           echo "website-url=${WEBSITE_URL}" >> "$GITHUB_OUTPUT"
