@@ -10,6 +10,10 @@ inputs:
   aws-role-arn:
     description: 'AWS role ARN secret'
     required: true
+  aws-region:
+    description: 'AWS region for state bucket'
+    required: false
+    default: 'us-east-1'
 runs:
   using: 'composite'
   steps:
@@ -31,33 +35,34 @@ runs:
           exit 1
         fi
         echo "✅ Required secrets validation passed"
+    
     - name: Ensure Terraform state bucket exists
       shell: bash
       run: |
-        STATE_BUCKET="${{ vars.S3_STATE_BUCKET_NAME }}"
-        REGION="${{ needs.common-env.outputs.aws_region }}"
+        S3_STATE_BUCKET_NAME="${{ inputs.s3-state-bucket-name }}"
+        REGION="${{ inputs.aws-region }}"
         
-        if [ -z "$STATE_BUCKET" ]; then
-          echo "❌ S3_STATE_BUCKET_NAME variable not set!"
+        if [ -z "$S3_STATE_BUCKET_NAME" ]; then
+          echo "❌ S3_STATE_BUCKET_NAME not provided!"
           exit 1
         fi
         
-        echo "Checking if state bucket $STATE_BUCKET exists..."
-        if ! aws s3api head-bucket --bucket "$STATE_BUCKET" 2>/dev/null; then
-          echo "Creating state bucket $STATE_BUCKET..."
+        echo "Checking if state bucket $S3_STATE_BUCKET_NAME exists..."
+        if ! aws s3api head-bucket --bucket "$S3_STATE_BUCKET_NAME" 2>/dev/null; then
+          echo "Creating state bucket $S3_STATE_BUCKET_NAME..."
           if [ "$REGION" = "us-east-1" ]; then
-            aws s3api create-bucket --bucket "$STATE_BUCKET" --region "$REGION"
+            aws s3api create-bucket --bucket "$S3_STATE_BUCKET_NAME" --region "$REGION"
           else
-            aws s3api create-bucket --bucket "$STATE_BUCKET" --region "$REGION" \
+            aws s3api create-bucket --bucket "$S3_STATE_BUCKET_NAME" --region "$REGION" \
               --create-bucket-configuration LocationConstraint="$REGION"
           fi
           
           # Enable versioning on state bucket
-          aws s3api put-bucket-versioning --bucket "$STATE_BUCKET" \
+          aws s3api put-bucket-versioning --bucket "$S3_STATE_BUCKET_NAME" \
             --versioning-configuration Status=Enabled
           
           # Enable encryption
-          aws s3api put-bucket-encryption --bucket "$STATE_BUCKET" \
+          aws s3api put-bucket-encryption --bucket "$S3_STATE_BUCKET_NAME" \
             --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
           
           echo "✅ State bucket created successfully"
