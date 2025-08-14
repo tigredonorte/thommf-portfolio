@@ -56,26 +56,6 @@ jobs:
       needs.infrastructure.result == 'success' &&
       (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && github.ref == 'refs/heads/main'))
     steps:
-      - name: Set environment slug
-        id: set-env
-        shell: bash
-        run: |
-          # Prefer explicit STAGE variable (repo/environment var) when provided
-          if [ -n "${{ vars.STAGE }}" ]; then
-            ENV_SLUG_VAL='${{ vars.STAGE }}'
-          elif [ -n "${STAGE}" ]; then
-            ENV_SLUG_VAL="${STAGE}"
-          else
-            ENV_INPUT="${{ github.event.inputs.environment || 'Production' }}"
-            if [ "$ENV_INPUT" = "Production" ]; then
-              ENV_SLUG_VAL="prod"
-            else
-              ENV_SLUG_VAL="dev"
-            fi
-          fi
-          echo "ENV_SLUG=$ENV_SLUG_VAL" >> "$GITHUB_ENV"
-          echo "Using ENV_SLUG=$ENV_SLUG_VAL"
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -100,7 +80,7 @@ jobs:
           # Get the bucket name from infrastructure job outputs or fallback to variable with env suffix
           BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
           if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${ENV_SLUG}"
+            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
           fi
           echo "📦 Using S3 bucket: $BUCKET_NAME"
 
@@ -128,7 +108,7 @@ jobs:
           cd infra/terraform
           terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
+            -backend-config="key=portfolio/${{ vars.STAGE }}/terraform.tfstate" \
             -backend-config="region=${{ needs.common-env.outputs.aws_region }}" >/dev/null 2>&1 || true
           DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "")
           if [ ! -z "$DISTRIBUTION_ID" ] && [ "$DISTRIBUTION_ID" != "null" ]; then
@@ -151,7 +131,7 @@ jobs:
           if [ -z "$WEBSITE_URL" ]; then
             BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
             if [ -z "$BUCKET_NAME" ]; then
-              BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${ENV_SLUG}"
+              BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
             fi
             WEBSITE_URL="http://$BUCKET_NAME.s3-website-${{ needs.common-env.outputs.aws_region }}.amazonaws.com"
           fi
@@ -163,12 +143,12 @@ jobs:
           echo "🌍 Environment: ${{ github.event.inputs.environment || 'Production' }}"
           BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
           if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${ENV_SLUG}"
+            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
           fi
           echo "📦 App files synced to S3 bucket: $BUCKET_NAME"
           echo "🌐 S3 Website URL: ${{ steps.get-url.outputs.website-url }}"
           cd infra/terraform
-          terraform init -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" -backend-config="region=${{ needs.common-env.outputs.aws_region }}" > /dev/null 2>&1 || true
+          terraform init -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" -backend-config="key=portfolio/${{ vars.STAGE }}/terraform.tfstate" -backend-config="region=${{ needs.common-env.outputs.aws_region }}" > /dev/null 2>&1 || true
           HTTPS_URL=$(terraform output -raw https_website_url 2>/dev/null || echo "")
           WWW_URL=$(terraform output -raw www_website_url 2>/dev/null || echo "")
           if [ ! -z "$HTTPS_URL" ] && [ "$HTTPS_URL" != "null" ]; then
