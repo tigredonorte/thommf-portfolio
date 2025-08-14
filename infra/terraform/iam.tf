@@ -198,8 +198,8 @@ resource "aws_iam_role_policy_attachment" "github_actions_role_policy" {
   policy_arn = aws_iam_policy.frontend_deployer_policy.arn
 }
 
-# Output for GitHub Actions Role ARN
+# GitHub Actions Role output
 output "github_actions_role_arn" {
   description = "ARN of the GitHub Actions Role for OIDC authentication"
-  value       = aws_iam_role.github_actions_role[0].arn
+  value       = try(aws_iam_role.github_actions_role[0].arn, null)
 }

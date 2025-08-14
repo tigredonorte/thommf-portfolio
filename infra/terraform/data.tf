@@ -1,10 +1,3 @@
-# Variable to control resource creation
-variable "create_shared_resources" {
-  description = "Whether to create shared resources (Route53, ACM cert) or use existing ones. Set to true only in prod."
-  type        = bool
-  default     = false
-}
-
 # ============================
 # Route53 Zone Management
 # ============================

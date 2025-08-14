@@ -168,10 +168,10 @@ jobs:
           fi
         env:
           TF_VAR_bucket_name: ${{ env.BASE_BUCKET }}
-          TF_VAR_environment: ${{ vars.STAGE }}
+          TF_VAR_environment: ${{ vars.STAGE || 'Production' }}
           TF_VAR_github_repository: ${{ github.repository }}
-          TF_VAR_create_iam_resources: true
-          TF_VAR_use_oidc: true
+          TF_VAR_create_iam_resources: ${{ vars.CREATE_IAM_RESOURCES || 'true' }}
+          TF_VAR_use_oidc: ${{ vars.USE_OIDC || 'true' }}
           TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || '' }}
           TF_VAR_subdomain_names: ${{ vars.SUBDOMAIN_NAMES || '[]' }}
           TF_VAR_create_ssl_certificate: ${{ env.USE_CUSTOM_DOMAIN }}
@@ -179,6 +179,7 @@ jobs:
           TF_VAR_create_route53_records: ${{ vars.CREATE_ROUTE53_RECORDS || 'false' }}
           TF_VAR_hosted_zone_id: ${{ vars.HOSTED_ZONE_ID || '' }}
           TF_VAR_create_shared_resources: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}
+          TF_VAR_resource_tag_environment: ${{ vars.RESOURCE_TAG_ENVIRONMENT || 'frontend' }}
 
       - name: Upload Terraform Plan
         uses: actions/upload-artifact@v4

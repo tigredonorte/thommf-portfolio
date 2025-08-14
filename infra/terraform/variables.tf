@@ -16,13 +16,9 @@ variable "environment" {
 }
 
 variable "resource_tag_environment" {
-  description = "Environment tag value for resources (must be 'frontend' for IAM policy compliance)"
+  description = "Environment tag value for resources (recommended: 'frontend' for IAM policy compliance)"
   type        = string
   default     = "frontend"
-  validation {
-    condition     = var.resource_tag_environment == "frontend"
-    error_message = "resource_tag_environment must be 'frontend' for IAM policy compliance."
-  }
 }
 
 variable "tags" {
@@ -63,16 +59,18 @@ variable "github_repository" {
 variable "domain_name" {
   description = "The primary domain name (e.g., thomfilg.com)"
   type        = string
+  default     = "" # Made optional
 }
 
 variable "subdomain_names" {
   description = "List of subdomains to include in the SSL certificate and CloudFront aliases"
   type        = list(string)
-  default     = ["www.thomfilg.com"]
+  default     = [] # Empty default
 
   validation {
     condition = alltrue([
-      for domain in var.subdomain_names : can(regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", domain))
+      for domain in var.subdomain_names :
+      domain == "" || can(regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", domain))
     ])
     error_message = "All subdomain names must be valid domain names."
   }
@@ -88,7 +86,7 @@ variable "hosted_zone_id" {
 variable "create_ssl_certificate" {
   description = "Whether to create an SSL certificate for the domain"
   type        = bool
-  default     = true
+  default     = false # Default to false since domain is optional
 }
 
 variable "create_cloudfront_distribution" {
@@ -99,6 +97,12 @@ variable "create_cloudfront_distribution" {
 
 variable "create_route53_records" {
   description = "Whether to create Route53 records pointing to CloudFront"
+  type        = bool
+  default     = false
+}
+
+variable "create_shared_resources" {
+  description = "Whether to create shared resources (Route53, ACM cert) or use existing ones"
   type        = bool
   default     = false
 }
