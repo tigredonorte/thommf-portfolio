@@ -85,33 +85,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set environment slug
-        id: set-env
-        shell: bash
-        run: |
-          if [ -n "${{ vars.STAGE }}" ]; then
-            ENV_SLUG_VAL='${{ vars.STAGE }}'
-          elif [ -n "${STAGE}" ]; then
-            ENV_SLUG_VAL="${STAGE}"
-          else
-            ENV_INPUT="${{ inputs.environment || github.event.inputs.environment || 'Production' }}"
-            if [ "$ENV_INPUT" = "Production" ]; then
-              ENV_SLUG_VAL="prod"
-            else
-              ENV_SLUG_VAL="dev"
-            fi
-          fi
-          echo "ENV_SLUG=$ENV_SLUG_VAL" >> "$GITHUB_ENV"
-          echo "VAR_FILE=terraform-${ENV_SLUG_VAL}.tfvars" >> "$GITHUB_ENV"
-          echo "Using ENV_SLUG=$ENV_SLUG_VAL"
-
       - name: Compute base bucket name
         id: base-bucket
         shell: bash
         run: |
           BASE="${{ vars.S3_BUCKET_NAME }}"
-          if [[ "$BASE" == *"-${ENV_SLUG}" ]]; then
-            BASE="${BASE%-${ENV_SLUG}}"
+          if [[ "$BASE" == *"-${{ vars.STAGE }}" ]]; then
+            BASE="${BASE%-${{ vars.STAGE }}}"
           fi
           echo "BASE_BUCKET=$BASE" >> "$GITHUB_ENV"
           echo "Base bucket: $BASE"
@@ -138,10 +118,10 @@ jobs:
         id: init
         working-directory: infra/terraform
         run: |
-          echo "Terraform state key: portfolio/${ENV_SLUG}/terraform.tfstate"
+          echo "Terraform state key: portfolio/${{ vars.STAGE }}/terraform.tfstate"
           terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
+            -backend-config="key=portfolio/${{ vars.STAGE }}/terraform.tfstate" \
             -backend-config="region=${{ needs.common-env.outputs.aws_region }}"
 
       - name: Terraform Format Check
@@ -191,7 +171,7 @@ jobs:
           fi
         env:
           TF_VAR_bucket_name: ${{ env.BASE_BUCKET }}
-          TF_VAR_environment: ${{ env.ENV_SLUG }}
+          TF_VAR_environment: ${{ vars.STAGE }}
           TF_VAR_github_repository: ${{ github.repository }}
           TF_VAR_create_iam_resources: true
           TF_VAR_use_oidc: true
@@ -224,33 +204,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set environment slug
-        id: set-env
-        shell: bash
-        run: |
-          if [ -n "${{ vars.STAGE }}" ]; then
-            ENV_SLUG_VAL='${{ vars.STAGE }}'
-          elif [ -n "${STAGE}" ]; then
-            ENV_SLUG_VAL="${STAGE}"
-          else
-            ENV_INPUT="${{ inputs.environment || github.event.inputs.environment || 'Production' }}"
-            if [ "$ENV_INPUT" = "Production" ]; then
-              ENV_SLUG_VAL="prod"
-            else
-              ENV_SLUG_VAL="dev"
-            fi
-          fi
-          echo "ENV_SLUG=$ENV_SLUG_VAL" >> "$GITHUB_ENV"
-          echo "VAR_FILE=terraform-${ENV_SLUG_VAL}.tfvars" >> "$GITHUB_ENV"
-          echo "Using ENV_SLUG=$ENV_SLUG_VAL"
-
       - name: Compute base bucket name
         id: base-bucket
         shell: bash
         run: |
           BASE="${{ vars.S3_BUCKET_NAME }}"
-          if [[ "$BASE" == *"-${ENV_SLUG}" ]]; then
-            BASE="${BASE%-${ENV_SLUG}}"
+          if [[ "$BASE" == *"-${{ vars.STAGE }}" ]]; then
+            BASE="${BASE%-${{ vars.STAGE }}}"
           fi
           echo "BASE_BUCKET=$BASE" >> "$GITHUB_ENV"
           echo "Base bucket: $BASE"
@@ -277,15 +237,15 @@ jobs:
         run: |
           terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
+            -backend-config="key=portfolio/${{ vars.STAGE }}/terraform.tfstate" \
             -backend-config="region=${{ needs.common-env.outputs.aws_region }}"
 
       - name: Debug environment and variables
         run: |
           echo "🔍 Debug Info:"
-          echo "ENV_SLUG: ${ENV_SLUG}"
+          echo "STAGE: ${{ vars.STAGE }}"
           echo "BASE_BUCKET: ${BASE_BUCKET}"  
-          echo "Expected bucket name: ${BASE_BUCKET}-${ENV_SLUG}"
+          echo "Expected bucket name: ${BASE_BUCKET}-${{ vars.STAGE }}"
           echo "CREATE_SHARED_RESOURCES: ${{ vars.CREATE_SHARED_RESOURCES || 'false' }}"
           echo "CREATE_SSL_CERTIFICATE: ${{ vars.CREATE_SSL_CERTIFICATE || 'false' }}"
           echo "DOMAIN_NAME: ${{ vars.DOMAIN_NAME || '(not set)' }}"
@@ -338,7 +298,7 @@ jobs:
         env:
           TF_INPUT: "false"
           TF_VAR_bucket_name: ${{ env.BASE_BUCKET }}
-          TF_VAR_environment: ${{ env.ENV_SLUG }}
+          TF_VAR_environment: ${{ vars.STAGE }}
           TF_VAR_github_repository: ${{ github.repository }}
           TF_VAR_create_iam_resources: true
           TF_VAR_use_oidc: true
@@ -352,7 +312,7 @@ jobs:
         run: |
           set -euo pipefail
           
-          BUCKET="${BASE_BUCKET}-${ENV_SLUG}"
+          BUCKET="${BASE_BUCKET}-${{ vars.STAGE }}"
           echo "Checking for existing bucket: $BUCKET"
           if aws s3api head-bucket --bucket "$BUCKET" >/dev/null 2>&1; then
             echo "Bucket exists, checking if already imported..."
@@ -381,7 +341,7 @@ jobs:
           fi
           
           # Import OAC if it exists
-          OAC_NAME="portfolio-oac-${ENV_SLUG}"
+          OAC_NAME="portfolio-oac-${{ vars.STAGE }}"
           echo "Checking for existing CloudFront OAC: $OAC_NAME"
           OAC_ID=$(aws cloudfront list-origin-access-controls --query "OriginAccessControlList.Items[?Name=='${OAC_NAME}'].Id" --output text 2>/dev/null || true)
           if [ -n "$OAC_ID" ] && [ "$OAC_ID" != "None" ]; then
@@ -397,7 +357,7 @@ jobs:
           fi
           
           # Import CloudFront distribution if it exists
-          BUCKET="${BASE_BUCKET}-${ENV_SLUG}"
+          BUCKET="${BASE_BUCKET}-${{ vars.STAGE }}"
           echo "Checking for existing CloudFront distribution with origin: $BUCKET"
           DIST_ID=$(aws cloudfront list-distributions \
             --query "DistributionList.Items[?contains(Origins.Items[*].DomainName, '${BUCKET}')].Id | [0]" \
@@ -425,7 +385,7 @@ jobs:
           fi
         env:
           TF_VAR_bucket_name: ${{ env.BASE_BUCKET }}
-          TF_VAR_environment: ${{ env.ENV_SLUG }}
+          TF_VAR_environment: ${{ vars.STAGE }}
           TF_VAR_github_repository: ${{ github.repository }}
           TF_VAR_create_iam_resources: true
           TF_VAR_use_oidc: true
@@ -488,25 +448,6 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ needs.common-env.outputs.aws_region }}
 
-      - name: Set environment slug
-        id: set-env
-        shell: bash
-        run: |
-          if [ -n "${{ vars.STAGE }}" ]; then
-            ENV_SLUG_VAL='${{ vars.STAGE }}'
-          elif [ -n "${STAGE}" ]; then
-            ENV_SLUG_VAL="${STAGE}"
-          else
-            ENV_INPUT="${{ inputs.environment || github.event.inputs.environment || 'Production' }}"
-            if [ "$ENV_INPUT" = "Production" ]; then
-              ENV_SLUG_VAL="prod"
-            else
-              ENV_SLUG_VAL="dev"
-            fi
-          fi
-          echo "ENV_SLUG=$ENV_SLUG_VAL" >> "$GITHUB_ENV"
-          echo "Using ENV_SLUG=$ENV_SLUG_VAL"
-
       - name: Terraform Init and Get Outputs (with fallbacks)
         id: get-outputs
         working-directory: infra/terraform
@@ -517,16 +458,16 @@ jobs:
 
           # Resolve base bucket (strip stage suffix if present)
           BASE="${{ vars.S3_BUCKET_NAME }}"
-          if [[ "$BASE" == *"-${ENV_SLUG}" ]]; then
-            BASE="${BASE%-${ENV_SLUG}}"
+          if [[ "$BASE" == *"-${{ vars.STAGE }}" ]]; then
+            BASE="${BASE%-${{ vars.STAGE }}}"
           fi
-          FALLBACK_BUCKET="${BASE}-${ENV_SLUG}"
+          FALLBACK_BUCKET="${BASE}-${{ vars.STAGE }}"
           FALLBACK_URL="http://${FALLBACK_BUCKET}.s3-website-${REGION}.amazonaws.com"
 
           # Try to init Terraform to read from state (may fail if bucket/state not created)
           if terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${ENV_SLUG}/terraform.tfstate" \
+            -backend-config="key=portfolio/${{ vars.STAGE }}/terraform.tfstate" \
             -backend-config="region=${REGION}" >/dev/null 2>&1; then
             S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "$FALLBACK_BUCKET")
             WEBSITE_URL=$(terraform output -raw website_url 2>/dev/null || echo "$FALLBACK_URL")
