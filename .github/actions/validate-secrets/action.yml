@@ -10,62 +10,43 @@ inputs:
   aws-role-arn:
     description: 'AWS role ARN secret'
     required: true
-  aws-region:
-    description: 'AWS region for state bucket'
-    required: false
-    default: 'us-east-1'
 runs:
   using: 'composite'
   steps:
     - name: Validate required secrets
       shell: bash
       run: |
+        echo "🔍 Validating required configuration..."
+        ERRORS=0
+        
         if [ -z "${{ inputs.s3-bucket-name }}" ]; then
-          echo "❌ ERROR: S3_BUCKET_NAME secret is required but not set!"
-          echo "Please set S3_BUCKET_NAME in your GitHub repository or Production environment secrets."
-          exit 1
+          echo "❌ ERROR: S3_BUCKET_NAME is required but not set!"
+          echo "   Please set S3_BUCKET_NAME in your GitHub repository variables."
+          ERRORS=$((ERRORS + 1))
+        else
+          echo "✅ S3_BUCKET_NAME is set"
         fi
+        
         if [ -z "${{ inputs.s3-state-bucket-name }}" ]; then
-          echo "❌ ERROR: S3_STATE_BUCKET_NAME secret is required but not set!"
-          echo "Please set S3_STATE_BUCKET_NAME in your GitHub repository or Production environment secrets."
-          exit 1
+          echo "❌ ERROR: S3_STATE_BUCKET_NAME is required but not set!"
+          echo "   Please set S3_STATE_BUCKET_NAME in your GitHub repository variables."
+          ERRORS=$((ERRORS + 1))
+        else
+          echo "✅ S3_STATE_BUCKET_NAME is set"
         fi
+        
         if [ -z "${{ inputs.aws-role-arn }}" ]; then
           echo "❌ ERROR: AWS_ROLE_ARN secret is required but not set!"
-          exit 1
-        fi
-        echo "✅ Required secrets validation passed"
-    
-    - name: Ensure Terraform state bucket exists
-      shell: bash
-      run: |
-        S3_STATE_BUCKET_NAME="${{ inputs.s3-state-bucket-name }}"
-        REGION="${{ inputs.aws-region }}"
-        
-        if [ -z "$S3_STATE_BUCKET_NAME" ]; then
-          echo "❌ S3_STATE_BUCKET_NAME not provided!"
-          exit 1
-        fi
-        
-        echo "Checking if state bucket $S3_STATE_BUCKET_NAME exists..."
-        if ! aws s3api head-bucket --bucket "$S3_STATE_BUCKET_NAME" 2>/dev/null; then
-          echo "Creating state bucket $S3_STATE_BUCKET_NAME..."
-          if [ "$REGION" = "us-east-1" ]; then
-            aws s3api create-bucket --bucket "$S3_STATE_BUCKET_NAME" --region "$REGION"
-          else
-            aws s3api create-bucket --bucket "$S3_STATE_BUCKET_NAME" --region "$REGION" \
-              --create-bucket-configuration LocationConstraint="$REGION"
-          fi
-          
-          # Enable versioning on state bucket
-          aws s3api put-bucket-versioning --bucket "$S3_STATE_BUCKET_NAME" \
-            --versioning-configuration Status=Enabled
-          
-          # Enable encryption
-          aws s3api put-bucket-encryption --bucket "$S3_STATE_BUCKET_NAME" \
-            --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
-          
-          echo "✅ State bucket created successfully"
+          echo "   Please set AWS_ROLE_ARN in your GitHub repository secrets."
+          ERRORS=$((ERRORS + 1))
         else
-          echo "✅ State bucket already exists"
+          echo "✅ AWS_ROLE_ARN is set"
         fi
+        
+        if [ $ERRORS -gt 0 ]; then
+          echo ""
+          echo "❌ $ERRORS required configuration(s) missing!"
+          exit 1
+        fi
+        
+        echo "✅ All required secrets validated successfully!"

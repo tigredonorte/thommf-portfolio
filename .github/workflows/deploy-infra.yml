@@ -99,7 +99,6 @@ jobs:
           s3-bucket-name: ${{ vars.S3_BUCKET_NAME }}
           s3-state-bucket-name: ${{ vars.S3_STATE_BUCKET_NAME }}
           aws-role-arn: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ needs.common-env.outputs.aws_region }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -110,6 +109,11 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ needs.common-env.outputs.aws_region }}
+
+      - uses: ./.github/actions/ensure-state-bucket
+        with:
+          state-bucket-name: ${{ vars.S3_STATE_BUCKET_NAME }}
           aws-region: ${{ needs.common-env.outputs.aws_region }}
 
       - name: Terraform Init
