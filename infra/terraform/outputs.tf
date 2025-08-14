@@ -97,3 +97,9 @@ output "cloudfront_invalidation_command" {
   description = "AWS CLI command to invalidate CloudFront cache"
   value       = try("aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.portfolio_distribution[0].id} --paths '/*'", null)
 }
+
+# GitHub Actions Role output
+output "github_actions_role_arn" {
+  description = "ARN of the GitHub Actions Role for OIDC authentication"
+  value       = try(aws_iam_role.github_actions_role[0].arn, null)
+}
