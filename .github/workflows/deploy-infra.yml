@@ -111,7 +111,7 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ needs.common-env.outputs.aws_region }}
 
-      - uses: ./.github/actions/ensure-state-bucket
+      - uses: ./.github/actions/ensure-terraform-state-bucket
         with:
           state-bucket-name: ${{ vars.S3_STATE_BUCKET_NAME }}
           aws-region: ${{ needs.common-env.outputs.aws_region }}
