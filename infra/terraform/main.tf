@@ -31,7 +31,7 @@ locals {
 
   # Combine the default subdomains (like 'www') with the environment-specific one (if any).
   all_subdomains = concat(var.subdomain_names, local.env_specific_subdomain)
-  
+
   # Determine if we should use CloudFront with custom domain
   use_custom_domain = var.create_cloudfront_distribution && var.create_ssl_certificate && var.domain_name != ""
 }
@@ -224,11 +224,11 @@ resource "aws_s3_bucket_policy" "portfolio_bucket_policy_public" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "PublicReadGetObject"
-        Effect = "Allow"
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
         Principal = "*"
-        Action   = "s3:GetObject"
-        Resource = "${aws_s3_bucket.portfolio_bucket.arn}/*"
+        Action    = "s3:GetObject"
+        Resource  = "${aws_s3_bucket.portfolio_bucket.arn}/*"
       }
     ]
   })

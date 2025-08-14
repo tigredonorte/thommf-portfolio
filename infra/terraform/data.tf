@@ -40,11 +40,11 @@ resource "aws_route53_zone" "main" {
 
 # Try to fetch existing ACM certificate
 data "aws_acm_certificate" "portfolio_cert" {
-  count    = !var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? 1 : 0
-  provider = aws.us_east_1
-  domain   = var.domain_name
-  statuses = ["ISSUED"]
-  types    = ["AMAZON_ISSUED"]
+  count       = !var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? 1 : 0
+  provider    = aws.us_east_1
+  domain      = var.domain_name
+  statuses    = ["ISSUED"]
+  types       = ["AMAZON_ISSUED"]
   most_recent = true
 }
 
@@ -105,10 +105,10 @@ locals {
   route53_zone_id = (
     var.create_shared_resources && var.domain_name != "" ? (
       length(aws_route53_zone.main) > 0 ? aws_route53_zone.main[0].zone_id : ""
-    ) : (
+      ) : (
       var.hosted_zone_id != "" ? (
         length(data.aws_route53_zone.main_by_id) > 0 ? data.aws_route53_zone.main_by_id[0].zone_id : ""
-      ) : (
+        ) : (
         var.domain_name != "" && length(data.aws_route53_zone.main_by_name) > 0 ? data.aws_route53_zone.main_by_name[0].zone_id : ""
       )
     )
@@ -118,7 +118,7 @@ locals {
   acm_certificate_arn = (
     var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? (
       length(aws_acm_certificate.portfolio_cert) > 0 ? aws_acm_certificate.portfolio_cert[0].arn : ""
-    ) : (
+      ) : (
       !var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? (
         length(data.aws_acm_certificate.portfolio_cert) > 0 ? data.aws_acm_certificate.portfolio_cert[0].arn : ""
       ) : ""
