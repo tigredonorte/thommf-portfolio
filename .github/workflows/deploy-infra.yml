@@ -89,10 +89,7 @@ jobs:
         id: base-bucket
         shell: bash
         run: |
-          BASE="${{ vars.S3_BUCKET_NAME }}"
-          if [[ "$BASE" == *"-${{ vars.STAGE }}" ]]; then
-            BASE="${BASE%-${{ vars.STAGE }}}"
-          fi
+          BASE="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
           echo "BASE_BUCKET=$BASE" >> "$GITHUB_ENV"
           echo "Base bucket: $BASE"
 
@@ -208,10 +205,7 @@ jobs:
         id: base-bucket
         shell: bash
         run: |
-          BASE="${{ vars.S3_BUCKET_NAME }}"
-          if [[ "$BASE" == *"-${{ vars.STAGE }}" ]]; then
-            BASE="${BASE%-${{ vars.STAGE }}}"
-          fi
+          BASE="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
           echo "BASE_BUCKET=$BASE" >> "$GITHUB_ENV"
           echo "Base bucket: $BASE"
 
@@ -457,22 +451,18 @@ jobs:
           REGION=${{ needs.common-env.outputs.aws_region }}
 
           # Resolve base bucket (strip stage suffix if present)
-          BASE="${{ vars.S3_BUCKET_NAME }}"
-          if [[ "$BASE" == *"-${{ vars.STAGE }}" ]]; then
-            BASE="${BASE%-${{ vars.STAGE }}}"
-          fi
-          FALLBACK_BUCKET="${BASE}-${{ vars.STAGE }}"
-          FALLBACK_URL="http://${FALLBACK_BUCKET}.s3-website-${REGION}.amazonaws.com"
+          BASE="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
+          FALLBACK_URL="http://${BASE}.s3-website-${REGION}.amazonaws.com"
 
           # Try to init Terraform to read from state (may fail if bucket/state not created)
           if terraform init \
             -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
             -backend-config="key=portfolio/${{ vars.STAGE }}/terraform.tfstate" \
             -backend-config="region=${REGION}" >/dev/null 2>&1; then
-            S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "$FALLBACK_BUCKET")
+            S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "$BASE")
             WEBSITE_URL=$(terraform output -raw website_url 2>/dev/null || echo "$FALLBACK_URL")
           else
-            S3_BUCKET_NAME="$FALLBACK_BUCKET"
+            S3_BUCKET_NAME="$BASE"
             WEBSITE_URL="$FALLBACK_URL"
           fi
 
