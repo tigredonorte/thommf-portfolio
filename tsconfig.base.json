@@ -23,6 +23,10 @@
       "@thommf-portfolio/portfolio-store": [
         "libs/portfolio-store/src/index.ts"
       ],
+      "@thommf-portfolio/service-worker": [
+        "libs/shared/service-worker/src/index.ts"
+      ],
+      "@thommf-portfolio/shared": ["libs/shared/src/index.ts"],
       "@thommf-portfolio/store": ["libs/store/src/index.ts"]
     }
   }
