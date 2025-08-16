@@ -165,10 +165,15 @@ jobs:
       - name: Terraform Plan
         working-directory: infra/terraform
         run: |
+          VAR_FILE="terraform-${{ vars.STAGE || 'prod' }}.tfvars"
+          echo "📄 Using variable file: ${VAR_FILE}"
           if [ -f "${VAR_FILE}" ]; then
+            echo "✅ Found variable file: ${VAR_FILE}"
             terraform plan -var-file="${VAR_FILE}" -out=tfplan
           else
-            echo "⚠️ ${VAR_FILE} not found. Planning with TF_VAR_* only."
+            echo "⚠️ ${VAR_FILE} not found. Available files:"
+            ls -la *.tfvars || true
+            echo "Planning with TF_VAR_* environment variables only."
             terraform plan -out=tfplan
           fi
         env:
@@ -378,9 +383,15 @@ jobs:
       - name: Re-plan for safety
         working-directory: infra/terraform
         run: |
+          VAR_FILE="terraform-${{ vars.STAGE || 'prod' }}.tfvars"
+          echo "📄 Using variable file: ${VAR_FILE}"
           if [ -f "${VAR_FILE}" ]; then
+            echo "✅ Found variable file: ${VAR_FILE}"
             terraform plan -var-file="${VAR_FILE}" -out=tfplan
           else
+            echo "⚠️ ${VAR_FILE} not found. Available files:"
+            ls -la *.tfvars || true
+            echo "Planning with TF_VAR_* environment variables only."
             terraform plan -out=tfplan
           fi
         env:
