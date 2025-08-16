@@ -48,13 +48,13 @@ export interface ServiceWorkerEventHandlers {
   onInstalling?: () => void;
   onWaiting?: () => void;
   onActive?: () => void;
-  onUpdate?: (registration: ServiceWorkerRegistration) => void;
+  onUpdate?: (registration: any) => void;
   onError?: (error: unknown) => void;
   onCacheUpdate?: (cacheName: string, url: string) => void;
 }
 
 export interface ServiceWorkerInstance {
-  register: () => Promise<ServiceWorkerRegistration | undefined>;
+  register: () => Promise<any>;
   unregister: () => Promise<boolean>;
   update: () => Promise<void>;
   getCacheStatus: () => Promise<CacheStatus>;

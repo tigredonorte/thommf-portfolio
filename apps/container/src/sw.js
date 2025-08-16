@@ -1,37 +1,139 @@
-const CACHE_NAME = 'thommf-portfolio-v1';
+// Auto-generated Service Worker
+// Generated from @thommf-portfolio/service-worker
+
+const STATIC_CACHE = 'thommf-portfolio-static-v1';
+const IMAGE_CACHE = 'thommf-portfolio-images-v1';
+const ASSET_CACHE = 'thommf-portfolio-assets-v1';
 const OFFLINE_PAGE = '/offline.html';
 
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/main.js',
-  '/runtime.js',
-  OFFLINE_PAGE
+  "/",
+  "/index.html",
+  "/styles.css",
+  "/main.js",
+  "/runtime.js"
 ];
 
-const IMAGE_CACHE = 'thommf-portfolio-images-v1';
-const ASSETS_CACHE = 'thommf-portfolio-assets-v1';
+const CACHE_STRATEGIES = {
+  "images": "cache-first",
+  "assets": "cache-first",
+  "navigation": "network-first"
+};
+const CACHE_OPTIONS = {
+  "images": {
+    "maxEntries": 100,
+    "maxAgeSeconds": 2592000
+  },
+  "assets": {
+    "maxEntries": 50,
+    "maxAgeSeconds": 604800
+  },
+  "static": {
+    "maxEntries": 20,
+    "maxAgeSeconds": 86400
+  }
+};
+
+class CacheManager {
+  constructor(cacheName, options = {}) {
+    this.cacheName = cacheName;
+    this.options = options;
+  }
+
+  async put(request, response) {
+    const cache = await caches.open(this.cacheName);
+    
+    if (this.options.maxEntries) {
+      await this.enforceMaxEntries(cache);
+    }
+    
+    const responseWithTimestamp = this.addTimestampToResponse(response);
+    await cache.put(request, responseWithTimestamp);
+  }
+
+  async match(request) {
+    const cache = await caches.open(this.cacheName);
+    const response = await cache.match(request);
+    
+    if (response && this.options.maxAgeSeconds) {
+      const isExpired = this.isResponseExpired(response);
+      if (isExpired) {
+        await cache.delete(request);
+        return undefined;
+      }
+    }
+    
+    return response;
+  }
+
+  async delete(request) {
+    const cache = await caches.open(this.cacheName);
+    return cache.delete(request);
+  }
+
+  async clear() {
+    const cache = await caches.open(this.cacheName);
+    const keys = await cache.keys();
+    await Promise.all(keys.map(key => cache.delete(key)));
+  }
+
+  async enforceMaxEntries(cache) {
+    if (!this.options.maxEntries) return;
+    
+    const keys = await cache.keys();
+    if (keys.length >= this.options.maxEntries) {
+      const entriesToDelete = keys.length - this.options.maxEntries + 1;
+      const keysToDelete = keys.slice(0, entriesToDelete);
+      await Promise.all(keysToDelete.map(key => cache.delete(key)));
+    }
+  }
+
+  isResponseExpired(response) {
+    if (!this.options.maxAgeSeconds) return false;
+    
+    const cachedDate = response.headers.get('sw-cache-timestamp');
+    if (!cachedDate) return false;
+    
+    const cacheTime = parseInt(cachedDate, 10);
+    const now = Date.now();
+    const maxAge = this.options.maxAgeSeconds * 1000;
+    
+    return (now - cacheTime) > maxAge;
+  }
+
+  addTimestampToResponse(response) {
+    const headers = new Headers(response.headers);
+    headers.set('sw-cache-timestamp', Date.now().toString());
+    
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+  }
+}
+
+const staticCacheManager = new CacheManager(STATIC_CACHE, CACHE_OPTIONS.static || {});
+const imageCacheManager = new CacheManager(IMAGE_CACHE, CACHE_OPTIONS.images || {});
+const assetCacheManager = new CacheManager(ASSET_CACHE, CACHE_OPTIONS.assets || {});
 
 self.addEventListener('install', (event) => {
   console.log('Service Worker: Installing...');
   
   event.waitUntil(
     Promise.all([
-      caches.open(CACHE_NAME).then(cache => {
-        console.log('Service Worker: Caching core assets');
-        return cache.addAll(STATIC_ASSETS.filter(url => url !== OFFLINE_PAGE));
-      }),
-      caches.open(CACHE_NAME).then(cache => {
-        console.log('Service Worker: Caching offline page');
-        return fetch(OFFLINE_PAGE).then(response => {
-          if (response.ok) {
-            return cache.put(OFFLINE_PAGE, response);
+      staticCacheManager.put('/', new Response('')).then(() => 
+        Promise.all(STATIC_ASSETS.map(async (url) => {
+          try {
+            const response = await fetch(url);
+            if (response.ok) {
+              await staticCacheManager.put(url, response);
+            }
+          } catch (error) {
+            console.warn('Failed to cache static asset:', url, error);
           }
-        }).catch(() => {
-          console.log('Service Worker: Offline page not found, skipping');
-        });
-      })
+        }))
+      )
     ])
   );
   
@@ -45,9 +147,9 @@ self.addEventListener('activate', (event) => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME && 
+          if (cacheName !== STATIC_CACHE && 
               cacheName !== IMAGE_CACHE && 
-              cacheName !== ASSETS_CACHE) {
+              cacheName !== ASSET_CACHE) {
             console.log('Service Worker: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -67,106 +169,130 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.includes('/assets/images/')) {
+  
+  if (url.pathname.includes('/assets/images/') || 
+      url.pathname.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)) {
     event.respondWith(handleImageRequest(request));
-  } else if (url.pathname.endsWith('.js') || 
-             url.pathname.endsWith('.css') || 
-             url.pathname.endsWith('.woff') || 
-             url.pathname.endsWith('.woff2')) {
-    event.respondWith(handleAssetRequest(request));
-  } else if (request.mode === 'navigate') {
-    event.respondWith(handleNavigationRequest(request));
-  } else {
-    event.respondWith(handleGeneralRequest(request));
+    return;
   }
+
+  
+  if (url.pathname.match(/\.(js|css|woff|woff2|ttf|eot)$/i)) {
+    event.respondWith(handleAssetRequest(request));
+    return;
+  }
+
+  if (request.mode === 'navigate') {
+    event.respondWith(handleNavigationRequest(request));
+    return;
+  }
+
+  event.respondWith(handleGeneralRequest(request));
 });
 
+
 async function handleImageRequest(request) {
-  try {
-    const cache = await caches.open(IMAGE_CACHE);
-    const cachedResponse = await cache.match(request);
-    
-    if (cachedResponse) {
-      console.log('Service Worker: Serving image from cache:', request.url);
-      return cachedResponse;
-    }
-    
-    const networkResponse = await fetch(request);
-    
-    if (networkResponse.ok) {
-      console.log('Service Worker: Caching new image:', request.url);
-      await cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
-  } catch (error) {
-    console.log('Service Worker: Image request failed:', error);
-    return new Response('Image not available', { 
-      status: 404,
-      statusText: 'Not Found' 
-    });
-  }
+  return handleWithStrategy(request, CACHE_STRATEGIES.images || 'cache-first', imageCacheManager);
 }
 
+
 async function handleAssetRequest(request) {
-  try {
-    const cache = await caches.open(ASSETS_CACHE);
-    const cachedResponse = await cache.match(request);
-    
-    if (cachedResponse) {
-      console.log('Service Worker: Serving asset from cache:', request.url);
-      return cachedResponse;
-    }
-    
-    const networkResponse = await fetch(request);
-    
-    if (networkResponse.ok) {
-      console.log('Service Worker: Caching new asset:', request.url);
-      await cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
-  } catch (error) {
-    console.log('Service Worker: Asset request failed:', error);
-    throw error;
-  }
+  return handleWithStrategy(request, CACHE_STRATEGIES.assets || 'cache-first', assetCacheManager);
 }
 
 async function handleNavigationRequest(request) {
-  try {
-    const networkResponse = await fetch(request);
-    return networkResponse;
-  } catch (error) {
-    console.log('Service Worker: Navigation request failed, serving offline page');
-    const cache = await caches.open(CACHE_NAME);
-    const offlineResponse = await cache.match(OFFLINE_PAGE);
-    return offlineResponse || new Response('Offline', { 
-      status: 503,
-      statusText: 'Service Unavailable' 
+  return handleWithStrategy(request, CACHE_STRATEGIES.navigation || 'network-first', staticCacheManager)
+    .catch(async () => {
+      const offlineResponse = await staticCacheManager.match(OFFLINE_PAGE);
+      return offlineResponse || new Response('Offline', { 
+        status: 503,
+        statusText: 'Service Unavailable' 
+      });
     });
-  }
 }
 
 async function handleGeneralRequest(request) {
+  return handleWithStrategy(request, 'network-first', staticCacheManager);
+}
+
+async function handleWithStrategy(request, strategy, cacheManager) {
+  switch (strategy) {
+    case 'cache-first':
+      return handleCacheFirst(request, cacheManager);
+    case 'network-first':
+      return handleNetworkFirst(request, cacheManager);
+    case 'cache-only':
+      return handleCacheOnly(request, cacheManager);
+    case 'network-only':
+      return handleNetworkOnly(request);
+    case 'stale-while-revalidate':
+      return handleStaleWhileRevalidate(request, cacheManager);
+    default:
+      return handleNetworkFirst(request, cacheManager);
+  }
+}
+
+async function handleCacheFirst(request, cacheManager) {
+  const cachedResponse = await cacheManager.match(request);
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+  
+  const networkResponse = await fetch(request);
+  if (networkResponse.ok) {
+    await cacheManager.put(request, networkResponse.clone());
+  }
+  
+  return networkResponse;
+}
+
+async function handleNetworkFirst(request, cacheManager) {
   try {
-    const cache = await caches.open(CACHE_NAME);
-    const cachedResponse = await cache.match(request);
-    
+    const networkResponse = await fetch(request);
+    if (networkResponse.ok) {
+      await cacheManager.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  } catch (error) {
+    const cachedResponse = await cacheManager.match(request);
     if (cachedResponse) {
       return cachedResponse;
     }
-    
-    const networkResponse = await fetch(request);
-    
-    if (networkResponse.ok && request.url.startsWith(self.location.origin)) {
-      await cache.put(request, networkResponse.clone());
-    }
-    
-    return networkResponse;
-  } catch (error) {
-    console.log('Service Worker: General request failed:', error);
     throw error;
   }
+}
+
+async function handleCacheOnly(request, cacheManager) {
+  const cachedResponse = await cacheManager.match(request);
+  if (cachedResponse) {
+    return cachedResponse;
+  }
+  
+  throw new Error('No cached response available');
+}
+
+async function handleNetworkOnly(request) {
+  return fetch(request);
+}
+
+async function handleStaleWhileRevalidate(request, cacheManager) {
+  const cachedResponse = await cacheManager.match(request);
+  
+  const fetchPromise = fetch(request).then(async (networkResponse) => {
+    if (networkResponse.ok) {
+      await cacheManager.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  }).catch(() => {
+    // Ignore network errors in background update
+  });
+  
+  if (cachedResponse) {
+    fetchPromise; // Fire and forget
+    return cachedResponse;
+  }
+  
+  return fetchPromise;
 }
 
 self.addEventListener('message', (event) => {
@@ -177,6 +303,14 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'GET_CACHE_STATUS') {
     getCacheStatus().then(status => {
       event.ports[0].postMessage(status);
+    });
+  }
+
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    clearCache(event.data.payload?.cacheName).then(() => {
+      event.ports[0].postMessage({ success: true });
+    }).catch(error => {
+      event.ports[0].postMessage({ success: false, error: error.message });
     });
   }
 });
@@ -192,4 +326,13 @@ async function getCacheStatus() {
   }
   
   return status;
+}
+
+async function clearCache(cacheName) {
+  if (cacheName) {
+    return caches.delete(cacheName);
+  } else {
+    const cacheNames = await caches.keys();
+    return Promise.all(cacheNames.map(name => caches.delete(name)));
+  }
 }

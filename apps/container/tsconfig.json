@@ -3,6 +3,9 @@
   "include": [],
   "references": [
     {
+      "path": "../../libs/shared/service-worker"
+    },
+    {
       "path": "../../libs/store"
     },
     {

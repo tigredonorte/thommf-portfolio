@@ -4,7 +4,11 @@
     "outDir": "../../../dist/out-tsc",
     "declaration": true,
     "types": ["node", "vite/client"],
-    "lib": ["ES2020", "WebWorker", "DOM"]
+    "lib": ["ES2020", "WebWorker", "DOM"],
+    "skipLibCheck": true,
+    "noImplicitAny": false,
+    "moduleResolution": "bundler",
+    "module": "ES2020"
   },
   "include": ["src/**/*.ts"],
   "exclude": ["jest.config.ts", "src/**/*.spec.ts", "src/**/*.test.ts"]

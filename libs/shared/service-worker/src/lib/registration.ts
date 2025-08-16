@@ -5,9 +5,10 @@ import {
   ServiceWorkerMessage,
   CacheStatus 
 } from './types';
+/// <reference path="./global.d.ts" />
 
 export class ServiceWorkerManager implements ServiceWorkerInstance {
-  private registration: ServiceWorkerRegistration | null = null;
+  private registration: any = null;
   private serviceWorkerUrl: string;
   private options: ServiceWorkerRegistrationOptions;
   private handlers: ServiceWorkerEventHandlers;
@@ -30,7 +31,7 @@ export class ServiceWorkerManager implements ServiceWorkerInstance {
     return 'serviceWorker' in navigator;
   }
 
-  async register(): Promise<ServiceWorkerRegistration | undefined> {
+  async register(): Promise<any> {
     if (!this.isSupported) {
       console.warn('Service Workers are not supported in this browser');
       this.handlers.onError?.('Service Workers not supported');
@@ -95,7 +96,7 @@ export class ServiceWorkerManager implements ServiceWorkerInstance {
 
       const messageChannel = new MessageChannel();
       
-      messageChannel.port1.onmessage = (event) => {
+      messageChannel.port1.onmessage = (event: MessageEvent) => {
         resolve(event.data);
       };
 
@@ -120,7 +121,7 @@ export class ServiceWorkerManager implements ServiceWorkerInstance {
 
       const messageChannel = new MessageChannel();
       
-      messageChannel.port1.onmessage = (event) => {
+      messageChannel.port1.onmessage = (event: MessageEvent) => {
         if (event.data.success) {
           resolve();
         } else {
@@ -173,7 +174,8 @@ export class ServiceWorkerManager implements ServiceWorkerInstance {
     });
 
     navigator.serviceWorker.addEventListener('message', (event) => {
-      const message: ServiceWorkerMessage<{ cacheName: string; url: string }> = event.data;
+      const messageEvent = event as MessageEvent;
+      const message: ServiceWorkerMessage<{ cacheName: string; url: string }> = messageEvent.data;
       
       if (message.type === 'CACHE_UPDATE') {
         this.handlers.onCacheUpdate?.(

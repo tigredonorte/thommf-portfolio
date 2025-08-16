@@ -2,6 +2,8 @@ import { composePlugins, withNx } from '@nx/webpack';
 import { withReact } from '@nx/react';
 import { withModuleFederation } from '@nx/module-federation/webpack';
 import { ModuleFederationConfig } from '@nx/module-federation';
+import { Configuration } from 'webpack';
+import * as CopyWebpackPlugin from 'copy-webpack-plugin';
 
 import baseConfig from './module-federation.config';
 
@@ -18,5 +20,17 @@ const config: ModuleFederationConfig = {
 export default composePlugins(
   withNx(),
   withReact(),
-  withModuleFederation(config, { dts: false })
+  withModuleFederation(config, { dts: false }),
+  (config: Configuration) => {
+    config.plugins = config.plugins || [];
+    config.plugins.push(
+      new CopyWebpackPlugin({
+        patterns: [
+          { from: 'src/sw.js', to: 'sw.js' },
+          { from: 'src/offline.html', to: 'offline.html' }
+        ]
+      })
+    );
+    return config;
+  }
 );

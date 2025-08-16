@@ -1,4 +1,5 @@
 import { CacheStrategy, CacheOptions } from './types';
+/// <reference path="./global.d.ts" />
 
 export class CacheManager {
   constructor(private cacheName: string, private options: CacheOptions = {}) {}
@@ -44,7 +45,7 @@ export class CacheManager {
     return cache.keys();
   }
 
-  private async enforceMaxEntries(cache: Cache): Promise<void> {
+  private async enforceMaxEntries(cache: any): Promise<void> {
     if (!this.options.maxEntries) return;
     
     const keys = await cache.keys();
