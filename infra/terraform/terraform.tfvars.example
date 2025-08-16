@@ -28,16 +28,11 @@ create_cloudfront_distribution  = true
 create_route53_records          = false
 hosted_zone_id                  = "" # Leave empty to auto-discover, or specify if you know it
 
-# Optional: Additional tags
-tags = {
-  ManagedBy = "terraform"
-  Owner     = "your-name"
-}
-
 # Additional Tags
 tags = {
-  Owner   = "thommf"
-  Project = "portfolio"
+  ManagedBy = "terraform"
+  Owner     = "thommf"
+  Project   = "portfolio"
 }
 
 # Static Asset Cache Configuration (Optional)
