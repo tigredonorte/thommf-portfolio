@@ -2,6 +2,9 @@
 	"folders": [
 		{
 			"path": "."
+		},
+		{
+			"path": "../thommf-portfolio-2"
 		}
 	],
 	"settings": {}
