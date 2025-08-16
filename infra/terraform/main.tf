@@ -176,9 +176,10 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
     Project     = "thommf-portfolio"
   }
 
-  depends_on = [
-    aws_acm_certificate_validation.portfolio_cert_validation
-  ]
+  # Note: Dependency on certificate validation removed since automatic validation is disabled
+  # depends_on = [
+  #   aws_acm_certificate_validation.portfolio_cert_validation
+  # ]
 }
 
 # ============================
