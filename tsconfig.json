@@ -29,6 +29,9 @@
     },
     {
       "path": "./libs/portfolio-store"
+    },
+    {
+      "path": "./libs/shared/service-worker"
     }
   ]
 }
