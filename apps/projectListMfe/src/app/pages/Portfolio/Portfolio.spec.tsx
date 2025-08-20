@@ -1,9 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import App from './app';
 import { configureStore } from '@reduxjs/toolkit';
 import { Language, languageSlice } from '@thommf-portfolio/store';
 import { portfolioReducer } from '@thommf-portfolio/portfolio-store';
 import { Provider } from 'react-redux';
+import { ClassicPortfolio } from './Portfolio';
 
 // Mock the config module
 jest.mock('@thommf-portfolio/config', () => ({
@@ -157,37 +157,37 @@ describe('ProjectListMfe App', () => {
 
   describe('Rendering', () => {
     it('should render successfully', () => {
-      const { baseElement } = renderWithProvider(<App />);
+      const { baseElement } = renderWithProvider(<ClassicPortfolio />);
       expect(baseElement).toBeTruthy();
     });
 
     it('should display the main title', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       expect(screen.getByText('Career & Projects')).toBeTruthy();
     });
 
     it('should render the wrapper div', () => {
-      const { container } = renderWithProvider(<App />);
+      const { container } = renderWithProvider(<ClassicPortfolio />);
       expect(container.querySelector('.wrapper')).toBeTruthy();
     });
   });
 
   describe('Initial State', () => {
     it('should show all experiences when no filter is applied', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       expect(screen.getByText('Test Company')).toBeTruthy();
       expect(screen.getByText('Another Company')).toBeTruthy();
     });
 
     it('should show all projects when no filter is applied', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       expect(screen.getByText('Test Project 1')).toBeTruthy();
       expect(screen.getByText('Test Project 2')).toBeTruthy();
       expect(screen.getByText('Frontend Project')).toBeTruthy();
     });
 
     it('should display highlighted technology filters', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       // Get all filter buttons and check they contain the expected technologies
       const filterButtons = screen.getAllByRole('button');
       const filterTexts = filterButtons.map(btn => btn.textContent);
@@ -203,13 +203,13 @@ describe('ProjectListMfe App', () => {
   describe('Search Functionality', () => {
     
     it('should have a search input', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByPlaceholderText('Filter by technology, project, or keyword...');
       expect(searchInput).toBeTruthy();
     });
 
     it('should filter projects based on search term', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       
       fireEvent.change(searchInput, { target: { value: 'React' } });
@@ -221,7 +221,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should filter by company name', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       
       fireEvent.change(searchInput, { target: { value: 'Another Company' } });
@@ -238,7 +238,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should filter by industry', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       
       fireEvent.change(searchInput, { target: { value: 'Healthcare' } });
@@ -250,7 +250,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should show no results message when no projects match', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       
       fireEvent.change(searchInput, { target: { value: 'NonexistentTech' } });
@@ -262,7 +262,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should clear search results when search term is cleared', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       
       // First filter
@@ -282,7 +282,7 @@ describe('ProjectListMfe App', () => {
 
   describe('Highlighted Filters', () => {
     it('should filter when highlighted technology is clicked', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       // Get the React filter button specifically from the highlighted filters area
       const filterButtons = screen.getAllByRole('button');
       const reactFilter = filterButtons.find(btn => btn.textContent === 'React');
@@ -297,7 +297,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should clear filter when same highlighted technology is clicked again', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const filterButtons = screen.getAllByRole('button');
       const reactFilter = filterButtons.find(btn => btn.textContent === 'React');
       
@@ -317,7 +317,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should update search input when highlighted filter is selected', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       const filterButtons = screen.getAllByRole('button');
       const angularFilter = filterButtons.find(btn => btn.textContent === 'Angular');
@@ -333,7 +333,7 @@ describe('ProjectListMfe App', () => {
 
   describe('Technology and Industry Integration', () => {
     it('should show projects with specific technologies', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       // Check that technologies appear in project cards
       expect(screen.getAllByText('React').length).toBeGreaterThan(0);
       expect(screen.getAllByText('Angular').length).toBeGreaterThan(0);
@@ -341,7 +341,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should show projects from different industries', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       // Use getAllByText to handle multiple matches and verify industry tags specifically
       expect(screen.getAllByText('Fintech').length).toBeGreaterThan(0);
       expect(screen.getAllByText('E-commerce').length).toBeGreaterThan(0);
@@ -359,7 +359,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should filter by industry using highlighted filters', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const filterButtons = screen.getAllByRole('button');
       const fintechFilter = filterButtons.find(btn => btn.textContent === 'Fintech');
       
@@ -375,7 +375,7 @@ describe('ProjectListMfe App', () => {
 
   describe('Experience Components', () => {
     it('should render experience components for each company', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const companyHeaders = screen.getAllByRole('heading', { level: 3 });
       expect(companyHeaders).toHaveLength(2);
       expect(companyHeaders[0].textContent).toBe('Test Company');
@@ -383,7 +383,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should show company roles', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       // Use getAllByText to handle multiple elements that contain the role text
       const fullStackElements = screen.getAllByText((content, element) => {
         return element?.textContent?.includes('Full Stack Engineer') || false;
@@ -397,7 +397,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should show date ranges', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       // Use getAllByText to handle multiple elements that contain the date text
       const jan2023Elements = screen.getAllByText((content, element) => {
         return element?.textContent?.includes('Jan 2023') || false;
@@ -421,14 +421,14 @@ describe('ProjectListMfe App', () => {
 
   describe('Accessibility', () => {
     it('should have proper heading structure', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Career & Projects');
       expect(screen.getAllByRole('heading', { level: 3 })).toHaveLength(2); // Company names
       expect(screen.getAllByRole('heading', { level: 5 })).toHaveLength(3); // Project titles
     });
 
     it('should have searchable input with proper role', () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox');
       expect(searchInput.getAttribute('placeholder')).toBe('Filter by technology, project, or keyword...');
     });
@@ -436,7 +436,7 @@ describe('ProjectListMfe App', () => {
 
   describe('Edge Cases', () => {
     it('should handle case-insensitive searches', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       
       fireEvent.change(searchInput, { target: { value: 'REACT' } });
@@ -447,7 +447,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should handle partial matches in descriptions', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       
       fireEvent.change(searchInput, { target: { value: 'frontend' } });
@@ -459,7 +459,7 @@ describe('ProjectListMfe App', () => {
     });
 
     it('should handle searches with extra whitespace', async () => {
-      renderWithProvider(<App />);
+      renderWithProvider(<ClassicPortfolio />);
       const searchInput = screen.getByRole('textbox') as HTMLInputElement;
       
       fireEvent.change(searchInput, { target: { value: '  React  ' } });
