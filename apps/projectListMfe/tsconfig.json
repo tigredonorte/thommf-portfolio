@@ -6,6 +6,9 @@
       "path": "../../libs/store"
     },
     {
+      "path": "../../libs/shared/config"
+    },
+    {
       "path": "../../libs/portfolio-store"
     },
     {
