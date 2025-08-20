@@ -15,14 +15,24 @@
 }
 
 .brand {
-  h1 {
-    margin: 0;
-    font-size: 1.25rem; // Adjusted for mobile
-  }
-  p {
-    margin: 0;
-    font-size: 0.8rem;
-    opacity: 0.8;
+  .brand-logo {
+    text-decoration: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    
+    .logo-text {
+      font-size: 1.5rem;
+      font-weight: bold;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      transition: background 0.2s ease;
+      
+      &:hover {
+        background: rgba(255, 255, 255, 0.2);
+      }
+    }
   }
 }
 
@@ -141,12 +151,8 @@
     padding: 1rem 2rem; // Restore original padding
   }
 
-  .brand h1 {
-    font-size: 1.5rem; // Restore original font size
-  }
-
-  .brand p {
-    font-size: 0.9rem;
+  .brand .brand-logo .logo-text {
+    font-size: 1.8rem; // Larger on desktop
   }
 
   .desktop-nav {

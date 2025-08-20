@@ -1,4 +1,3 @@
-import { config } from '@thommf-portfolio/config';
 import { useState } from 'react';
 import { LanguageToggle } from './LanguageToggle/LanguageToggle';
 import { NavLinks } from './NavLinks/NavLinks';
@@ -16,8 +15,9 @@ export function Menu() {
   return (
     <header className="header">
       <div className="brand">
-        <h1>{config.developerName}</h1>
-        <p>{config.developerRole}</p>
+        <a href="/" className="brand-logo">
+          <span className="logo-text">TF</span>
+        </a>
       </div>
 
       {/* Desktop Navigation */}

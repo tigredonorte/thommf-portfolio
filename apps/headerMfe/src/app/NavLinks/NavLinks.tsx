@@ -12,7 +12,7 @@ export function NavLinks({ currentPath, variant, onClick }: NavLinksProps) {
   return (
     <>
       <a 
-        href={currentPath === '/' ? '#' : '/'} 
+        href="/" 
         className={currentPath === '/' ? 'active' : ''} 
         onClick={onClick}
       >
@@ -32,7 +32,29 @@ export function NavLinks({ currentPath, variant, onClick }: NavLinksProps) {
           <rect x="14" y="14" width="7" height="7"></rect>
           <rect x="3" y="14" width="7" height="7"></rect>
         </svg>
-        Projects
+        Classic View
+      </a>
+      
+      <a 
+        href="/portfolio" 
+        className={currentPath === '/portfolio' ? 'active' : ''} 
+        onClick={onClick}
+      >
+        <svg 
+          xmlns="http://www.w3.org/2000/svg" 
+          width={iconSize} 
+          height={iconSize} 
+          viewBox="0 0 24 24" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="2" 
+          strokeLinecap="round" 
+          strokeLinejoin="round"
+        >
+          <path d="M12 2L2 7V17C2 17.55 2.45 18 3 18H9V12H15V18H21C21.55 18 22 17.55 22 17V7L12 2Z"></path>
+          <polygon points="12,2 22,7 22,17 12,12 2,17 2,7"></polygon>
+        </svg>
+        Creative Portfolio
       </a>
       
       <a 
