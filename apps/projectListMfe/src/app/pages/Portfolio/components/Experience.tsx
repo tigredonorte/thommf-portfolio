@@ -1,4 +1,4 @@
-import { useExperience } from '../contexts/ExperienceContext';
+import { useExperience } from '../../../contexts/ExperienceContext';
 import { ExperienceHeader } from './ExperienceHeader';
 import { ProjectList } from './ProjectList';
 import './Experience.scss';
