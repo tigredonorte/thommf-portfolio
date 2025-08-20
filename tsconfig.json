@@ -29,6 +29,12 @@
     },
     {
       "path": "./libs/portfolio-store"
+    },
+    {
+      "path": "./apps/contactMfe-e2e"
+    },
+    {
+      "path": "./apps/contactMfe"
     }
   ]
 }
