@@ -15,7 +15,7 @@ const config: ModuleFederationConfig = {
    * declare module 'my-external-remote';
    *
    */
-  remotes: ['headerMfe', 'projectListMfe'],
+  remotes: ['headerMfe', 'projectListMfe', 'contactMfe'],
   shared: createSharedConfig()
 };
 

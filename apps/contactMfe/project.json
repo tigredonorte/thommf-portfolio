@@ -1,0 +1,75 @@
+{
+  "name": "contactMfe",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/contactMfe/src",
+  "projectType": "application",
+  "tags": ["mfe", "contact", "app"],
+  "targets": {
+    "build": {
+      "executor": "@nx/webpack:webpack",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "compiler": "babel",
+        "outputPath": "apps/contactMfe/dist",
+        "index": "apps/contactMfe/src/index.html",
+        "baseHref": "/",
+        "main": "apps/contactMfe/src/main.ts",
+        "tsConfig": "apps/contactMfe/tsconfig.app.json",
+        "assets": [
+          "apps/contactMfe/src/favicon.ico",
+          "apps/contactMfe/src/assets"
+        ],
+        "styles": ["apps/contactMfe/src/styles.scss"],
+        "scripts": [],
+        "webpackConfig": "apps/contactMfe/webpack.config.ts"
+      },
+      "configurations": {
+        "development": {
+          "extractLicenses": false,
+          "optimization": false,
+          "sourceMap": true,
+          "vendorChunk": true
+        },
+        "production": {
+          "optimization": true,
+          "outputHashing": "none",
+          "sourceMap": false,
+          "namedChunks": false,
+          "extractLicenses": true,
+          "vendorChunk": false,
+          "baseHref": "/contactMfe/",
+          "webpackConfig": "apps/contactMfe/webpack.config.prod.ts"
+        }
+      },
+      "dependsOn": ["^build", "typecheck"]
+    },
+    "serve": {
+      "executor": "@nx/react:module-federation-dev-server",
+      "defaultConfiguration": "development",
+      "options": {
+        "buildTarget": "contactMfe:build",
+        "hmr": true,
+        "port": 4203,
+        "allowedHosts": "all"
+      },
+      "configurations": {
+        "development": {
+          "buildTarget": "contactMfe:build:development"
+        },
+        "production": {
+          "buildTarget": "contactMfe:build:production",
+          "hmr": false
+        }
+      },
+      "dependsOn": ["typecheck"]
+    },
+    "serve-static": {
+      "executor": "@nx/react:module-federation-static-server",
+      "options": {
+        "serveTarget": "contactMfe:serve:production",
+        "staticFilePath": "apps/contactMfe/dist"
+      }
+    }
+  }
+}

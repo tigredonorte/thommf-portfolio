@@ -60,35 +60,43 @@ resource "aws_acm_certificate" "portfolio_cert" {
   }
 }
 
-# DNS records for ACM validation (only when creating new certificate AND have a zone)
-resource "aws_route53_record" "cert_validation" {
-  for_each = var.create_shared_resources && var.create_ssl_certificate && local.route53_zone_id != "" ? {
-    for dvo in aws_acm_certificate.portfolio_cert[0].domain_validation_options : dvo.domain_name => dvo
-    if dvo.resource_record_name != null
-  } : {}
+# Note: DNS validation records for ACM certificates are commented out to avoid 
+# the "for_each depends on resource attributes" issue in Terraform plan.
+# For production use, certificates should be pre-created and validated manually,
+# or validation records should be created in a separate terraform apply step.
 
-  zone_id = local.route53_zone_id
-  name    = each.value.resource_record_name
-  type    = each.value.resource_record_type
-  records = [each.value.resource_record_value]
-  ttl     = 60
+# # DNS records for ACM validation (only when creating new certificate AND have a zone)
+# resource "aws_route53_record" "cert_validation" {
+#   for_each = var.create_shared_resources && var.create_ssl_certificate && local.route53_zone_id != "" ? {
+#     for dvo in aws_acm_certificate.portfolio_cert[0].domain_validation_options : dvo.domain_name => {
+#       name   = dvo.resource_record_name
+#       record = dvo.resource_record_value
+#       type   = dvo.resource_record_type
+#     }
+#   } : {}
+# 
+#   zone_id = local.route53_zone_id
+#   name    = each.value.name
+#   type    = each.value.type
+#   records = [each.value.record]
+#   ttl     = 60
+# 
+#   lifecycle {
+#     create_before_destroy = true
+#   }
+# }
 
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Certificate validation (only when creating new certificate AND have validation records)
-resource "aws_acm_certificate_validation" "portfolio_cert_validation" {
-  count                   = var.create_shared_resources && var.create_ssl_certificate && local.route53_zone_id != "" ? 1 : 0
-  provider                = aws.us_east_1
-  certificate_arn         = aws_acm_certificate.portfolio_cert[0].arn
-  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
-
-  timeouts {
-    create = "30m"
-  }
-}
+# # Certificate validation (only when creating new certificate AND have validation records)
+# resource "aws_acm_certificate_validation" "portfolio_cert_validation" {
+#   count                   = var.create_shared_resources && var.create_ssl_certificate && local.route53_zone_id != "" ? 1 : 0
+#   provider                = aws.us_east_1
+#   certificate_arn         = aws_acm_certificate.portfolio_cert[0].arn
+#   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+# 
+#   timeouts {
+#     create = "30m"
+#   }
+# }
 
 # ============================
 # Local values for easy reference
@@ -117,4 +125,7 @@ locals {
       ) : ""
     )
   )
+
+  # Note: Removed cert_domains_for_validation and domain_validation_options 
+  # since automatic DNS validation is disabled to avoid Terraform plan issues
 }
