@@ -32,6 +32,12 @@
     },
     {
       "path": "./libs/shared/service-worker"
+    },
+    {
+      "path": "./apps/contactMfe-e2e"
+    },
+    {
+      "path": "./apps/contactMfe"
     }
   ]
 }
