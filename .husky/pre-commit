@@ -1,0 +1,111 @@
+#!/bin/bash
+
+# Check if there are staged changes in the infra/terraform directory
+if git diff --cached --name-only | grep -q "^infra/terraform/"; then
+    echo "🔍 Detected changes in infra/terraform - running terraform checks..."
+    
+    # Run terraform fmt recursively on the terraform folder
+    echo "📝 Running terraform fmt..."
+    terraform fmt -recursive infra/terraform/
+    
+    # Check if terraform fmt made any changes
+    if git diff --name-only | grep -q "^infra/terraform/"; then
+        echo "🎨 Terraform formatting applied. Adding formatted files to commit..."
+        # Add the formatted files back to the staging area
+        git add infra/terraform/
+    fi
+    
+    # Run terraform validate
+    echo "🔧 Running terraform validate..."
+    cd infra/terraform/ || exit 1
+    
+    # Initialize terraform if needed (quietly)
+    if [ ! -d ".terraform" ]; then
+        echo "📦 Initializing terraform..."
+        terraform init -backend=false > /dev/null 2>&1
+    fi
+    
+    # Run validation
+    if ! terraform validate; then
+        echo "❌ Terraform validation failed. Please fix the errors before committing."
+        exit 1
+    fi
+    
+    echo "✅ Terraform validation passed."
+    
+    # Run tflint if available
+    if command -v tflint &> /dev/null; then
+        echo "🔍 Running tflint..."
+        
+        # Initialize tflint if config exists and not initialized
+        if [ -f ".tflint.hcl" ]; then
+            if [ ! -d ".tflint.d" ]; then
+                echo "📦 Initializing tflint plugins..."
+                tflint --init 2>/dev/null || echo "⚠️  TFLint init failed, continuing without plugins"
+            fi
+            
+            # Run tflint on all terraform files
+            if ! tflint --recursive --format compact 2>/dev/null; then
+                echo "⚠️  TFLint found issues (or failed to run properly)."
+                echo "💡 Tip: Run 'tflint --recursive' in infra/terraform/ to see detailed issues."
+                # Not failing the commit for tflint issues
+            else
+                echo "✅ TFLint checks passed."
+            fi
+        else
+            # Run basic tflint without config
+            if tflint --recursive --format compact 2>/dev/null; then
+                echo "✅ TFLint checks passed."
+            fi
+        fi
+    else
+        echo "⚠️  TFLint is not installed. Skipping linting checks."
+        echo ""
+        echo "   📦 To install tflint, run ONE of the following:"
+        echo ""
+        echo "   Linux/WSL:"
+        echo "   curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
+        echo ""
+        echo "   macOS:"
+        echo "   brew install tflint"
+        echo ""
+        echo "   Manual installation:"
+        echo "   1. Download from: https://github.com/terraform-linters/tflint/releases"
+        echo "   2. Extract and move to /usr/local/bin/"
+        echo "   3. Make executable: chmod +x /usr/local/bin/tflint"
+        echo ""
+    fi
+    
+    # Run Checkov if available (security scanning)
+    if command -v checkov &> /dev/null; then
+        echo "🔐 Running Checkov security scan..."
+        if ! checkov -d . --quiet --compact --framework terraform --skip-check CKV_AWS_18,CKV_AWS_19,CKV_AWS_20,CKV_AWS_21; then
+            echo "⚠️  Checkov found security issues. Review them before committing."
+            echo "   Run 'checkov -d infra/terraform/' for details."
+            # Not failing on Checkov by default as it can be too strict
+        else
+            echo "✅ Checkov security scan passed."
+        fi
+    else
+        echo "ℹ️  Checkov is not installed. Skipping security scans."
+        echo ""
+        echo "   🔐 To install Checkov for security scanning:"
+        echo ""
+        echo "   Using pip (Python 3.7+):"
+        echo "   pip3 install checkov"
+        echo ""
+        echo "   Using pipx (recommended):"
+        echo "   pipx install checkov"
+        echo ""
+        echo "   Using Homebrew (macOS):"
+        echo "   brew install checkov"
+        echo ""
+    fi
+    
+    cd - > /dev/null
+    
+    echo "✨ All terraform checks complete."
+fi
+
+# Exit successfully to allow the commit to proceed
+exit 0
