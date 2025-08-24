@@ -1,145 +1,355 @@
-#!/bin/bash
+#!/bin/sh
+# POSIX-compliant pre-commit hook for Terraform
+set -eu
 
-# Check if there are staged changes in apps/ or libs/ directories
-if git diff --cached --name-only | grep -qE "^(apps|libs)/"; then
-    echo "🔍 Detected changes in apps/ or libs/ - running code quality checks..."
+# Enable pipefail if using bash
+if [ -n "${BASH_VERSION:-}" ]; then
+    set -o pipefail
+fi
+
+# Color codes for output (POSIX-compatible)
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Track if any checks failed
+CHECKS_FAILED=0
+
+# Ensure we're in the git repository root
+GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
+    printf "${RED}❌ Not in a git repository${NC}\n"
+    exit 1
+}
+cd "$GIT_ROOT"
+
+check_terraform_installed() {
+    if ! command -v terraform >/dev/null 2>&1; then
+        printf "${RED}❌ Terraform is not installed${NC}\n"
+        printf "\n"
+        printf "   📦 To install terraform:\n"
+        printf "   - Download from: https://www.terraform.io/downloads\n"
+        printf "   - Or use package manager:\n"
+        printf "     brew install terraform  (macOS)\n"
+        printf "     sudo apt-get install terraform  (Ubuntu/Debian)\n"
+        printf "\n"
+        return 1
+    fi
+    return 0
+}
+
+run_tf_lint() {
+    tflint_cmd=""
     
+    # Check for tflint in common locations including snap
+    if command -v tflint >/dev/null 2>&1; then
+        tflint_cmd="tflint"
+    elif [ -x "/snap/bin/tflint" ]; then
+        tflint_cmd="/snap/bin/tflint"
+    else
+        printf "${YELLOW}⚠️  TFLint is not installed. Skipping linting checks.${NC}\n"
+        printf "\n"
+        printf "   📦 To install tflint, run ONE of the following:\n"
+        printf "\n"
+        printf "   Linux/WSL:\n"
+        printf "   curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash\n"
+        printf "\n"
+        printf "   macOS:\n"
+        printf "   brew install tflint\n"
+        printf "\n"
+        printf "   Manual installation:\n"
+        printf "   1. Download from: https://github.com/terraform-linters/tflint/releases\n"
+        printf "   2. Extract and move to /usr/local/bin/\n"
+        printf "   3. Make executable: chmod +x /usr/local/bin/tflint\n"
+        printf "\n"
+        return 1
+    fi
+
+    printf "${BLUE}🔍 Running tflint...${NC}\n"
+    
+    # Initialize tflint if config exists and not initialized
+    if [ -f "infra/terraform/.tflint.hcl" ]; then
+        if [ ! -d "infra/terraform/.tflint.d" ]; then
+            printf "📦 Initializing tflint plugins...\n"
+            (cd infra/terraform && $tflint_cmd --init) || {
+                printf "${YELLOW}⚠️  TFLint init failed, continuing without plugins${NC}\n"
+            }
+        fi
+    fi
+
+    # Run tflint on terraform directory
+    if ! (cd infra/terraform && $tflint_cmd --recursive --format compact); then
+        printf "${RED}❌ TFLint found issues${NC}\n"
+        printf "💡 Tip: Run 'cd infra/terraform && $tflint_cmd --recursive' to see detailed issues.\n"
+        return 1
+    fi
+    
+    printf "${GREEN}✅ TFLint checks passed${NC}\n"
+    return 0
+}
+
+run_tf_fmt() {
+    printf "${BLUE}📝 Running terraform fmt...${NC}\n"
+    
+    # Run terraform fmt recursively on the terraform folder
+    if ! terraform fmt -recursive -check infra/terraform/; then
+        printf "🎨 Terraform files need formatting. Applying formatting...\n"
+        terraform fmt -recursive infra/terraform/
+        
+        # Add the formatted files back to the staging area
+        git add infra/terraform/
+        printf "${GREEN}✅ Terraform files formatted and staged${NC}\n"
+    else
+        printf "${GREEN}✅ Terraform files already formatted${NC}\n"
+    fi
+    
+    return 0
+}
+
+run_tf_validate() {
+    printf "${BLUE}🔧 Running terraform validate...${NC}\n"
+    
+    # Run validation in terraform directory
+    (
+        cd infra/terraform/ || return 1
+        
+        # Initialize terraform if needed (quietly)
+        if [ ! -d ".terraform" ]; then
+            printf "📦 Initializing terraform...\n"
+            terraform init -backend=false -input=false >/dev/null 2>&1 || {
+                printf "${RED}❌ Terraform init failed${NC}\n"
+                return 1
+            }
+        fi
+        
+        # Run validation
+        if ! terraform validate; then
+            printf "${RED}❌ Terraform validation failed${NC}\n"
+            return 1
+        fi
+    ) || return 1
+    
+    printf "${GREEN}✅ Terraform validation passed${NC}\n"
+    return 0
+}
+
+run_checkov() {
+    # Run Checkov if available (security scanning)
+    if ! command -v checkov >/dev/null 2>&1; then
+        printf "${YELLOW}ℹ️  Checkov is not installed. Skipping security scans.${NC}\n"
+        printf "\n"
+        printf "   🔐 To install Checkov for security scanning:\n"
+        printf "\n"
+        printf "   Using pip (Python 3.7+):\n"
+        printf "   pip3 install checkov\n"
+        printf "\n"
+        printf "   Using pipx (recommended):\n"
+        printf "   pipx install checkov\n"
+        printf "\n"
+        printf "   Using Homebrew (macOS):\n"
+        printf "   brew install checkov\n"
+        printf "\n"
+        return 1
+    fi
+
+    printf "${BLUE}🔐 Running Checkov security scan...${NC}\n"
+    
+    # Run checkov with specific skips
+    if ! checkov -d infra/terraform/ \
+         --quiet \
+         --compact \
+         --framework terraform \
+         --skip-check CKV_AWS_18,CKV_AWS_19,CKV_AWS_20,CKV_AWS_21 \
+         --output cli; then
+        printf "${RED}❌ Checkov found security issues${NC}\n"
+        printf "   Run 'checkov -d infra/terraform/' for details.\n"
+        return 1
+    fi
+    
+    printf "${GREEN}✅ Checkov security scan passed${NC}\n"
+    return 0
+}
+
+get_changed_files() {
+    # Get staged files
+    staged_files=$(git diff --cached --name-only 2>/dev/null || echo "")
+    
+    # Get files from the current commit (for amend operations)
+    head_files=""
+    if git rev-parse --verify HEAD >/dev/null 2>&1; then
+        head_files=$(git diff-tree --no-commit-id --name-only -r HEAD 2>/dev/null || echo "")
+    fi
+    
+    # Combine both file lists
+    all_files=""
+    if [ -n "$staged_files" ]; then
+        all_files="$staged_files"
+    fi
+    if [ -n "$head_files" ]; then
+        if [ -n "$all_files" ]; then
+            all_files="$all_files
+$head_files"
+        else
+            all_files="$head_files"
+        fi
+    fi
+    
+    # Remove duplicates and empty lines
+    if [ -n "$all_files" ]; then
+        echo "$all_files" | sort -u | grep -v '^$' || echo ""
+    else
+        echo ""
+    fi
+}
+
+run_lint() {
+    has_app_changes=false
+
+    changed_files=$(get_changed_files)
+}
+
+run_tf_checks() {
+    has_tf_changes=false
+    
+    # Get all changed files (staged or in HEAD for amend)
+    changed_files=$(get_changed_files)
+    
+    # Debug output - show what files were detected
+    if [ -n "${DEBUG_PRE_COMMIT:-}" ]; then
+        printf "Debug: Changed files detected:\n%s\n\n" "$changed_files"
+    fi
+    
+    # Look for any .tf files or files in directories containing terraform
+    if echo "$changed_files" | grep -qE '(\.tf$|\.tfvars$|\.hcl$|terraform/)'; then
+        has_tf_changes=true
+    fi
+    
+    if [ "$has_tf_changes" = false ]; then
+        printf "ℹ️  No Terraform changes detected, skipping checks.\n"
+        return 0
+    fi
+    
+    printf "${BLUE}🚀 Running Terraform checks...${NC}\n"
+    printf "\n"
+    
+    # Check if terraform is installed first
+    if ! check_terraform_installed; then
+        return 1
+    fi
+    
+    # Run all checks, accumulating failures
+    failed=0
+    
+    # Format check (always succeeds but may modify files)
+    run_tf_fmt || true
+    
+    # Validation
+    if ! run_tf_validate; then
+        failed=$((failed + 1))
+    fi
+    
+    # Linting (optional, warns if not installed)
+    if ! run_tf_lint; then
+        printf "${YELLOW}⚠️  TFLint check skipped or failed${NC}\n"
+    fi
+    
+    # Security scanning (optional, warns if not installed)
+    if ! run_checkov; then
+        printf "${YELLOW}⚠️  Checkov check skipped or failed${NC}\n"
+    fi
+    
+    if [ $failed -gt 0 ]; then
+        printf "\n"
+        printf "${RED}❌ Some Terraform checks failed. Please fix the issues before committing.${NC}\n"
+        return 1
+    fi
+    
+    printf "\n"
+    printf "${GREEN}✨ All Terraform checks complete${NC}\n"
+    return 0
+}
+
+has_app_changes() {
+    has_changes=false
+    
+    # Get all changed files (staged or in HEAD for amend)
+    changed_files=$(get_changed_files)
+
+    if echo "$changed_files" | grep -qE '^(apps|libs)/'; then
+        has_changes=true
+    fi
+
+    if [ "$has_changes" = false ]; then
+        return 0
+    fi
+
+    return 1
+}
+
+run_lint() {
     # Run nx lint for affected projects
     echo "📝 Running nx lint on affected projects..."
     if ! npx nx affected:lint --base=HEAD~1; then
         echo "❌ Linting failed. Please fix the errors before committing."
-        exit 1
+        return 1
     fi
     echo "✅ Linting passed."
-    
-    # Run nx format:check for affected projects
+}
+
+run_fmt_check() {
     echo "🎨 Checking code formatting..."
     if ! npx nx format:check --base=HEAD~1; then
         echo "❌ Code formatting issues found."
         echo "💡 Run 'pnpm format' to fix formatting issues."
-        exit 1
+        return 1
     fi
     echo "✅ Code formatting check passed."
-    
-    # Run type checking if TypeScript files are changed
-    if git diff --cached --name-only | grep -qE "\.(ts|tsx)$"; then
+}
+
+run_typecheck() {
+    changed_files=$(get_changed_files)
+    if echo "$changed_files" | grep -qE "\.(ts|tsx)$"; then
         echo "🔧 Running TypeScript type checking..."
         if ! npx nx run-many --target=typecheck --all --parallel; then
             echo "❌ TypeScript type checking failed. Please fix the errors before committing."
-            exit 1
+            return 1
         fi
         echo "✅ TypeScript type checking passed."
     fi
-    
-    echo "✨ All code quality checks complete."
-fi
+}
 
-# Check if there are staged changes in the infra/terraform directory
-if git diff --cached --name-only | grep -q "^infra/terraform/"; then
-    echo "🔍 Detected changes in infra/terraform - running terraform checks..."
-    
-    # Run terraform fmt recursively on the terraform folder
-    echo "📝 Running terraform fmt..."
-    terraform fmt -recursive infra/terraform/
-    
-    # Check if terraform fmt made any changes
-    if git diff --name-only | grep -q "^infra/terraform/"; then
-        echo "🎨 Terraform formatting applied. Adding formatted files to commit..."
-        # Add the formatted files back to the staging area
-        git add infra/terraform/
+run_quality_checks() {
+
+    if ! has_app_changes; then
+        printf "ℹ️  No application changes detected, skipping checks.\n"
+        return 0
     fi
-    
-    # Run terraform validate
-    echo "🔧 Running terraform validate..."
-    cd infra/terraform/ || exit 1
-    
-    # Initialize terraform if needed (quietly)
-    if [ ! -d ".terraform" ]; then
-        echo "📦 Initializing terraform..."
-        terraform init -backend=false > /dev/null 2>&1
+    echo "🔍 Detected changes in apps/ or libs/ - running code quality checks..."
+ 
+    run_lint || return 1
+    run_fmt_check || return 1
+    run_typecheck || return 1
+
+    echo "✨ All code quality checks complete."
+}
+
+main() {
+    if ! run_tf_checks; then
+        printf "${RED}❌ Pre-commit checks failed${NC}\n"
+        exit 1
     fi
-    
-    # Run validation
-    if ! terraform validate; then
-        echo "❌ Terraform validation failed. Please fix the errors before committing."
+
+    if ! run_quality_checks; then
+        printf "${RED}❌ Pre-commit checks failed${NC}\n"
         exit 1
     fi
     
-    echo "✅ Terraform validation passed."
-    
-    # Run tflint if available
-    if command -v tflint &> /dev/null; then
-        echo "🔍 Running tflint..."
-        
-        # Initialize tflint if config exists and not initialized
-        if [ -f ".tflint.hcl" ]; then
-            if [ ! -d ".tflint.d" ]; then
-                echo "📦 Initializing tflint plugins..."
-                tflint --init 2>/dev/null || echo "⚠️  TFLint init failed, continuing without plugins"
-            fi
-            
-            # Run tflint on all terraform files
-            if ! tflint --recursive --format compact 2>/dev/null; then
-                echo "⚠️  TFLint found issues (or failed to run properly)."
-                echo "💡 Tip: Run 'tflint --recursive' in infra/terraform/ to see detailed issues."
-                # Not failing the commit for tflint issues
-            else
-                echo "✅ TFLint checks passed."
-            fi
-        else
-            # Run basic tflint without config
-            if tflint --recursive --format compact 2>/dev/null; then
-                echo "✅ TFLint checks passed."
-            fi
-        fi
-    else
-        echo "⚠️  TFLint is not installed. Skipping linting checks."
-        echo ""
-        echo "   📦 To install tflint, run ONE of the following:"
-        echo ""
-        echo "   Linux/WSL:"
-        echo "   curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash"
-        echo ""
-        echo "   macOS:"
-        echo "   brew install tflint"
-        echo ""
-        echo "   Manual installation:"
-        echo "   1. Download from: https://github.com/terraform-linters/tflint/releases"
-        echo "   2. Extract and move to /usr/local/bin/"
-        echo "   3. Make executable: chmod +x /usr/local/bin/tflint"
-        echo ""
-    fi
-    
-    # Run Checkov if available (security scanning)
-    if command -v checkov &> /dev/null; then
-        echo "🔐 Running Checkov security scan..."
-        if ! checkov -d . --quiet --compact --framework terraform --skip-check CKV_AWS_18,CKV_AWS_19,CKV_AWS_20,CKV_AWS_21; then
-            echo "⚠️  Checkov found security issues. Review them before committing."
-            echo "   Run 'checkov -d infra/terraform/' for details."
-            # Not failing on Checkov by default as it can be too strict
-        else
-            echo "✅ Checkov security scan passed."
-        fi
-    else
-        echo "ℹ️  Checkov is not installed. Skipping security scans."
-        echo ""
-        echo "   🔐 To install Checkov for security scanning:"
-        echo ""
-        echo "   Using pip (Python 3.7+):"
-        echo "   pip3 install checkov"
-        echo ""
-        echo "   Using pipx (recommended):"
-        echo "   pipx install checkov"
-        echo ""
-        echo "   Using Homebrew (macOS):"
-        echo "   brew install checkov"
-        echo ""
-    fi
-    
-    cd - > /dev/null
-    
-    echo "✨ All terraform checks complete."
-fi
+    printf "${GREEN}✅ All pre-commit checks passed${NC}\n"
+    exit 0
+}
 
-# Exit successfully to allow the commit to proceed
-exit 0
+# Trap to ensure we return to original directory on exit
+trap 'cd "$GIT_ROOT" 2>/dev/null || true' EXIT
+
+main "$@"

@@ -8,12 +8,6 @@ variable "environment" {
   type        = string
 }
 
-variable "cloudfront_distribution_arn" {
-  description = "CloudFront distribution ARN (optional - only used if bucket policy is managed within this module)"
-  type        = string
-  default     = ""
-}
-
 variable "default_index_content" {
   description = "Default content for index.html"
   type        = string
@@ -33,4 +27,47 @@ variable "default_index_content" {
     </body>
     </html>
   HTML
+}
+
+variable "enable_kms_encryption" {
+  description = "Enable KMS encryption for S3 bucket"
+  type        = bool
+  default     = true
+}
+
+variable "kms_key_id" {
+  description = "KMS key ID for S3 encryption (if not provided, a new key will be created)"
+  type        = string
+  default     = ""
+}
+
+variable "enable_versioning" {
+  description = "Enable versioning on S3 bucket"
+  type        = bool
+  default     = true
+}
+
+variable "enable_cross_region_replication" {
+  description = "Enable cross-region replication"
+  type        = bool
+  default     = false
+}
+
+
+variable "enable_event_notifications" {
+  description = "Enable S3 event notifications"
+  type        = bool
+  default     = true
+}
+
+variable "enable_lifecycle_rules" {
+  description = "Enable lifecycle rules for S3 bucket"
+  type        = bool
+  default     = true
+}
+
+variable "enable_access_logging" {
+  description = "Enable S3 bucket access logging"
+  type        = bool
+  default     = true
 }
