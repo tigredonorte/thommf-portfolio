@@ -1,14 +1,25 @@
 locals {
   full_domain = "${var.subdomain}.${var.domain_name}"
+
+  # For prod, we want both root and www; for others, just the subdomain
+  domain_aliases = var.environment == "prod" ? [
+    var.domain_name,      # thomfilg.com
+    local.full_domain     # www.thomfilg.com
+  ] : [local.full_domain] # dev.thomfilg.com or staging.thomfilg.com
 }
 
 # Create S3 bucket first (without policy)
 module "s3_website" {
   source = "./modules/s3-website"
 
-  project_name = var.project_name
-  environment  = var.environment
-  # CloudFront ARN not needed here - bucket policy is managed separately below
+  project_name                    = var.project_name
+  environment                     = var.environment
+  enable_kms_encryption           = true
+  enable_versioning               = true
+  enable_cross_region_replication = var.environment == "prod"
+  enable_event_notifications      = true
+  enable_lifecycle_rules          = true
+  enable_access_logging           = true
 }
 
 # Get Route53 zone
@@ -19,9 +30,10 @@ data "aws_route53_zone" "main" {
 
 # Create ACM certificate for CloudFront (must be in us-east-1)
 resource "aws_acm_certificate" "website" {
-  provider          = aws.us_east_1
-  domain_name       = local.full_domain
-  validation_method = "DNS"
+  provider                  = aws.us_east_1
+  domain_name               = local.full_domain
+  validation_method         = "DNS"
+  subject_alternative_names = var.environment == "prod" ? [var.domain_name] : []
 
   lifecycle {
     create_before_destroy = true
@@ -58,12 +70,20 @@ resource "aws_acm_certificate_validation" "website" {
 module "cloudfront" {
   source = "./modules/cloudfront"
 
-  project_name          = var.project_name
-  environment           = var.environment
-  domain_name           = local.full_domain
-  s3_bucket_id          = module.s3_website.bucket_id
-  s3_bucket_domain_name = module.s3_website.bucket_regional_domain_name
-  certificate_arn       = aws_acm_certificate_validation.website.certificate_arn
+  project_name                   = var.project_name
+  environment                    = var.environment
+  domain_aliases                 = local.domain_aliases
+  s3_bucket_id                   = module.s3_website.bucket_id
+  s3_bucket_domain_name          = module.s3_website.bucket_regional_domain_name
+  certificate_arn                = aws_acm_certificate_validation.website.certificate_arn
+  enable_access_logging          = true
+  enable_waf                     = var.environment == "prod"
+  enable_geo_restriction         = true
+  geo_restriction_type           = "whitelist"
+  geo_restriction_locations      = ["US", "CA", "GB", "DE", "FR", "AU", "JP"]
+  enable_origin_failover         = true
+  failover_origin_domain_name    = module.s3_website.bucket_regional_domain_name
+  create_response_headers_policy = true
 
   providers = {
     aws.us_east_1 = aws.us_east_1
@@ -78,9 +98,23 @@ module "route53" {
   zone_id                   = data.aws_route53_zone.main.zone_id
   subdomain_name            = local.full_domain
   cloudfront_domain_name    = module.cloudfront.distribution_domain_name
-  cloudfront_hosted_zone_id = "Z2FDTNDATAQYW2" # CloudFront's hosted zone ID
+  cloudfront_hosted_zone_id = module.cloudfront.distribution_hosted_zone_id
 
   depends_on = [module.cloudfront]
+}
+
+resource "aws_route53_record" "root_domain" {
+  count = var.environment == "prod" ? 1 : 0
+
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = module.cloudfront.distribution_domain_name
+    zone_id                = module.cloudfront.distribution_hosted_zone_id
+    evaluate_target_health = false
+  }
 }
 
 # Update S3 bucket policy with correct CloudFront ARN

@@ -1,3 +1,14 @@
+terraform {
+  required_version = ">= 1.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = ">= 5.0"
+    }
+  }
+}
+
 # IAM role for GitHub Actions OIDC
 resource "aws_iam_role" "github_actions" {
   count = var.github_repo != "" ? 1 : 0
