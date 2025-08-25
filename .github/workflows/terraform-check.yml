@@ -1,0 +1,80 @@
+name: Terraform Check
+
+on:
+  push:
+    branches: [tf-5]
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.7.0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Create Terraform state bucket if not exists
+        run: |
+          BUCKET_NAME="thommf-portfolio-terraform-state"
+          if ! aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+            echo "Creating state bucket $BUCKET_NAME..."
+            aws s3api create-bucket --bucket "$BUCKET_NAME" --region us-east-1
+            aws s3api put-bucket-versioning --bucket "$BUCKET_NAME" --versioning-configuration Status=Enabled
+            aws s3api put-bucket-encryption --bucket "$BUCKET_NAME" \
+              --server-side-encryption-configuration '{"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}}]}'
+            aws s3api put-public-access-block --bucket "$BUCKET_NAME" \
+              --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+            echo "State bucket created successfully"
+          else
+            echo "State bucket already exists"
+          fi
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=thommf-portfolio-terraform-state" \
+            -backend-config="key=portfolio/local/terraform.tfstate" \
+            -backend-config="region=us-east-1"
+
+      - name: Terraform Format Check
+        working-directory: infra/terraform
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        working-directory: infra/terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: infra/terraform
+        run: terraform plan
+        env:
+          TF_VAR_aws_region: us-east-1
+          TF_VAR_bucket_name: thommf-portfolio-static-site
+          TF_VAR_environment: local
+          TF_VAR_github_repository: ${{ github.repository }}
+          TF_VAR_create_iam_resources: true
+          TF_VAR_use_oidc: true
+          TF_VAR_domain_name: ""
+          TF_VAR_subdomain_names: "[]"
+          TF_VAR_create_ssl_certificate: false
+          TF_VAR_create_cloudfront_distribution: true
+          TF_VAR_create_route53_records: false
+          TF_VAR_hosted_zone_id: ""
+          TF_VAR_create_shared_resources: false
+          TF_VAR_resource_tag_environment: frontend

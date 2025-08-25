@@ -47,6 +47,7 @@ resource "aws_s3_bucket" "portfolio_bucket" {
     Environment = var.resource_tag_environment
     Project     = "thommf-portfolio"
     Workspace   = terraform.workspace
+    Stage       = var.environment
   }
 }
 
@@ -109,7 +110,8 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
   default_root_object = "index.html"
 
   # Only set aliases if we have a valid certificate
-  aliases = local.use_custom_domain ? concat([var.domain_name], local.all_subdomains) : []
+  # Use try() to handle cases where certificate might not be ready yet
+  aliases = local.use_custom_domain && var.domain_name != "" && try(local.acm_certificate_arn != "", false) && try(local.acm_certificate_arn != null, false) ? concat([var.domain_name], local.all_subdomains) : []
 
   default_cache_behavior {
     allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
@@ -154,7 +156,7 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
 
   # Dynamic viewer certificate configuration
   dynamic "viewer_certificate" {
-    for_each = local.use_custom_domain ? [1] : []
+    for_each = local.use_custom_domain && var.domain_name != "" && try(local.acm_certificate_arn != "", false) && try(local.acm_certificate_arn != null, false) ? [1] : []
     content {
       acm_certificate_arn      = local.acm_certificate_arn
       ssl_support_method       = "sni-only"
@@ -162,9 +164,9 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
     }
   }
 
-  # Use CloudFront default certificate if no custom domain
+  # Use CloudFront default certificate if no custom domain or no valid certificate
   dynamic "viewer_certificate" {
-    for_each = local.use_custom_domain ? [] : [1]
+    for_each = (!local.use_custom_domain || var.domain_name == "" || try(local.acm_certificate_arn == "", true) || try(local.acm_certificate_arn == null, true)) ? [1] : []
     content {
       cloudfront_default_certificate = true
     }
@@ -176,6 +178,9 @@ resource "aws_cloudfront_distribution" "portfolio_distribution" {
     Project     = "thommf-portfolio"
   }
 
+  # Ensure certificate validation completes before creating distribution (when creating new cert)
+  # Note: depends_on doesn't support conditional expressions, so we include all potential dependencies
+  # The actual dependency will only exist if the resource is created
   depends_on = [
     aws_acm_certificate_validation.portfolio_cert_validation
   ]
@@ -242,7 +247,7 @@ resource "aws_s3_bucket_policy" "portfolio_bucket_policy_public" {
 # DNS Records (Root + Subdomains)
 # ============================
 resource "aws_route53_record" "portfolio_apex" {
-  count   = var.create_route53_records && var.create_cloudfront_distribution ? 1 : 0
+  count   = var.create_route53_records && var.create_cloudfront_distribution && local.route53_zone_id != "" && var.domain_name != "" ? 1 : 0
   zone_id = local.route53_zone_id
   name    = var.domain_name
   type    = "A"
@@ -255,7 +260,7 @@ resource "aws_route53_record" "portfolio_apex" {
 }
 
 resource "aws_route53_record" "portfolio_subdomains" {
-  for_each = var.create_route53_records && var.create_cloudfront_distribution ? toset(local.all_subdomains) : toset([])
+  for_each = var.create_route53_records && var.create_cloudfront_distribution && local.route53_zone_id != "" ? toset(local.all_subdomains) : toset([])
 
   zone_id = local.route53_zone_id
   name    = each.key

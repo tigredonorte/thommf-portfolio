@@ -15,8 +15,12 @@ output "s3_website_endpoint" {
 }
 
 output "website_url" {
-  description = "Website URL (HTTP)"
-  value       = "http://${aws_s3_bucket_website_configuration.portfolio_website.website_endpoint}"
+  description = "Website URL"
+  value = var.create_cloudfront_distribution && length(aws_cloudfront_distribution.portfolio_distribution) > 0 ? (
+    local.use_custom_domain && try(local.acm_certificate_arn != "", false) && var.domain_name != "" ?
+    "https://${var.domain_name}" :
+    "https://${aws_cloudfront_distribution.portfolio_distribution[0].domain_name}"
+  ) : "http://${aws_s3_bucket_website_configuration.portfolio_website.website_endpoint}"
 }
 
 output "deployment_bucket_sync_command" {

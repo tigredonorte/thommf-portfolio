@@ -20,19 +20,17 @@ runs:
         ERRORS=0
         
         if [ -z "${{ inputs.s3-bucket-name }}" ]; then
-          echo "❌ ERROR: S3_BUCKET_NAME is required but not set!"
-          echo "   Please set S3_BUCKET_NAME in your GitHub repository variables."
-          ERRORS=$((ERRORS + 1))
+          echo "⚠️ WARNING: S3_BUCKET_NAME is not set, using fallback value"
+          echo "   Consider setting S3_BUCKET_NAME in your GitHub repository variables for customization."
         else
-          echo "✅ S3_BUCKET_NAME is set"
+          echo "✅ S3_BUCKET_NAME is set: ${{ inputs.s3-bucket-name }}"
         fi
         
         if [ -z "${{ inputs.s3-state-bucket-name }}" ]; then
-          echo "❌ ERROR: S3_STATE_BUCKET_NAME is required but not set!"
-          echo "   Please set S3_STATE_BUCKET_NAME in your GitHub repository variables."
-          ERRORS=$((ERRORS + 1))
+          echo "⚠️ WARNING: S3_STATE_BUCKET_NAME is not set, using fallback value"
+          echo "   Consider setting S3_STATE_BUCKET_NAME in your GitHub repository variables for customization."
         else
-          echo "✅ S3_STATE_BUCKET_NAME is set"
+          echo "✅ S3_STATE_BUCKET_NAME is set: ${{ inputs.s3-state-bucket-name }}"
         fi
         
         if [ -z "${{ inputs.aws-role-arn }}" ]; then

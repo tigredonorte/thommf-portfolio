@@ -2,7 +2,7 @@ name: Deploy Application
 
 on:
   push:
-    branches: [main]
+    branches: [main, tf-5]
     paths:
       - 'infra/**'
       - 'apps/**'
@@ -15,7 +15,7 @@ on:
   workflow_run:
     workflows: ["Deploy Infrastructure"]
     types: [completed]
-    branches: [main]
+    branches: [main, tf-5]
   workflow_dispatch: # Allow manual trigger
     inputs:
       environment:
@@ -40,7 +40,7 @@ jobs:
   infrastructure:
     needs: [common-env]
     if: |
-      (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && github.ref == 'refs/heads/main'))
+      (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tf-5')))
     uses: ./.github/workflows/deploy-infra.yml
     with:
       environment: ${{ github.event.inputs.environment || 'Production' }}
@@ -54,7 +54,7 @@ jobs:
     environment: ${{ github.event.inputs.environment || 'Production' }}
     if: |
       needs.infrastructure.result == 'success' &&
-      (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && github.ref == 'refs/heads/main'))
+      (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/tf-5')))
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

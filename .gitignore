@@ -55,3 +55,4 @@ vitest.config.*.timestamp*
 .pnpm-store
 playwright-report
 tsconfig.spec.tsbuildinfo
+.cache*

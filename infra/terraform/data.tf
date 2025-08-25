@@ -9,8 +9,10 @@ data "aws_route53_zone" "main_by_id" {
 }
 
 # Try to fetch existing Route53 zone by name if ID not provided
+# DISABLED: Multiple zones with same name cause conflicts
+# TODO: Require hosted_zone_id to be explicitly provided when using existing zones
 data "aws_route53_zone" "main_by_name" {
-  count        = !var.create_shared_resources && var.hosted_zone_id == "" && var.domain_name != "" ? 1 : 0
+  count        = 0 # Disabled due to multiple zones issue
   name         = var.domain_name
   private_zone = false
 }
@@ -62,7 +64,7 @@ resource "aws_acm_certificate" "portfolio_cert" {
 
 # DNS records for ACM validation (only when creating new certificate AND have a zone)
 resource "aws_route53_record" "cert_validation" {
-  for_each = var.create_shared_resources && var.create_ssl_certificate && local.route53_zone_id != "" ? {
+  for_each = var.create_shared_resources && var.create_ssl_certificate && local.route53_zone_id != "" && length(aws_acm_certificate.portfolio_cert) > 0 ? {
     for dvo in aws_acm_certificate.portfolio_cert[0].domain_validation_options : dvo.domain_name => dvo
     if dvo.resource_record_name != null
   } : {}
@@ -107,14 +109,17 @@ locals {
     )
   )
 
-  # ACM Certificate ARN - use created cert if available, otherwise use existing cert
+  # ACM Certificate ARN - use validated cert if creating new, otherwise use existing cert
+  # When creating new cert, use the validation resource to ensure it's ready
   acm_certificate_arn = (
     var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? (
-      length(aws_acm_certificate.portfolio_cert) > 0 ? aws_acm_certificate.portfolio_cert[0].arn : ""
+      length(aws_acm_certificate_validation.portfolio_cert_validation) > 0 ?
+      aws_acm_certificate_validation.portfolio_cert_validation[0].certificate_arn :
+      ""
       ) : (
-      !var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" ? (
-        length(data.aws_acm_certificate.portfolio_cert) > 0 ? data.aws_acm_certificate.portfolio_cert[0].arn : ""
-      ) : ""
+      !var.create_shared_resources && var.create_ssl_certificate && var.domain_name != "" && length(data.aws_acm_certificate.portfolio_cert) > 0 ?
+      data.aws_acm_certificate.portfolio_cert[0].arn :
+      ""
     )
   )
 }

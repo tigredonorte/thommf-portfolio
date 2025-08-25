@@ -7,6 +7,7 @@ variable "aws_region" {
 variable "bucket_name" {
   description = "Name of the S3 bucket for hosting the static website (must be globally unique)"
   type        = string
+  default     = "thommf-portfolio-static-site"
 }
 
 variable "environment" {
@@ -49,6 +50,7 @@ variable "use_oidc" {
 variable "github_repository" {
   description = "GitHub repository in the format 'owner/repo' for OIDC authentication"
   type        = string
+  default     = "tigredonorte/thommf-portfolio"
   validation {
     condition     = can(regex("^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$", var.github_repository))
     error_message = "github_repository must be in the format 'owner/repo' (e.g., 'username/my-repo')."
