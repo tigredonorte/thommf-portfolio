@@ -1,8 +1,8 @@
-name: Deploy Application
+name: Deploy App Simple
 
 on:
   push:
-    branches: [main]
+    branches: [main, infra/*]
     paths:
       - 'infra/**'
       - 'apps/**'
@@ -13,48 +13,51 @@ on:
       - 'tsconfig*.json'
       - '.github/workflows/**'
   workflow_run:
-    workflows: ["Deploy Infrastructure"]
+    workflows: ["Terraform Deploy v2"]
     types: [completed]
     branches: [main]
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
     inputs:
       environment:
         description: 'Environment to deploy to'
         required: true
-        default: 'Production'
+        default: 'dev'
         type: choice
         options:
-          - Production
-          - Development
+          - dev
+          - staging
+          - prod
 
 permissions:
-  id-token: write # Required for OIDC
-  contents: read # Required for actions/checkout
-  actions: read # Required for reusable workflows
+  id-token: write
+  contents: read
 
 jobs:
   common-env:
     uses: ./.github/workflows/common-env.yml
 
-  # Deploy infrastructure first if needed (includes CI)
   infrastructure:
     needs: [common-env]
     if: |
-      (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && github.ref == 'refs/heads/main'))
-    uses: ./.github/workflows/deploy-infra.yml
+      github.event_name != 'workflow_run'
+    uses: ./.github/workflows/terraform-deploy-v2.yml
     with:
-      environment: ${{ github.event.inputs.environment || 'Production' }}
-      dry_run: false
+      environment: ${{ github.event.inputs.environment || 'dev' }}
+      action: 'apply'
     secrets: inherit
+    permissions:
+      id-token: write
+      contents: read
+      pull-requests: write
 
-  # Deploy the application to S3
   deploy:
-    needs: [common-env, infrastructure]
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'Production' }}
+    needs: [common-env, infrastructure]
     if: |
-      needs.infrastructure.result == 'success' &&
-      (github.event_name != 'pull_request' || (needs.common-env.outputs.deploy_on_pr == 'true' && github.ref == 'refs/heads/main'))
+      always() && 
+      needs.common-env.result == 'success' &&
+      (needs.infrastructure.result == 'success' || needs.infrastructure.result == 'skipped' || github.event.workflow_run.conclusion == 'success')
+    environment: ${{ github.event.inputs.environment || 'dev' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,98 +69,138 @@ jobs:
 
       - name: Build application
         run: |
-          # Build all apps in production mode, excluding e2e tests
+          echo "🔨 Building all applications..."
           npx nx run-many --target=build --configuration=production --all --exclude="*-e2e"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ needs.common-env.outputs.aws_region }}
+          aws-region: us-east-1
 
-      - name: Sync files to S3
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Get infrastructure outputs
+        id: infra
         run: |
-          # Get the bucket name from infrastructure job outputs or fallback to variable with env suffix
+          ENV="${{ github.event.inputs.environment || 'dev' }}"
+          echo "🔍 Getting infrastructure outputs for environment: $ENV"
+          
+          # Try to use outputs from infrastructure job first
           BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
+          DISTRIBUTION_ID="${{ needs.infrastructure.outputs.cloudfront-distribution-id }}"
+          WEBSITE_URL="${{ needs.infrastructure.outputs.website-url }}"
+          
+          # If not available from job outputs, get from terraform state
           if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
+            cd infra/terraform
+            
+            # Initialize Terraform with environment-specific backend config
+            terraform init \
+              -backend-config="environments/$ENV/backend.tfvars" \
+              -reconfigure
+            
+            # Get outputs
+            BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "")
+            DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "")
+            WEBSITE_URL=$(terraform output -raw website_url 2>/dev/null || echo "")
           fi
-          echo "📦 Using S3 bucket: $BUCKET_NAME"
+          
+          echo "s3-bucket=$BUCKET_NAME" >> $GITHUB_OUTPUT
+          echo "cloudfront-id=$DISTRIBUTION_ID" >> $GITHUB_OUTPUT
+          echo "website-url=$WEBSITE_URL" >> $GITHUB_OUTPUT
+          
+          echo "📦 S3 Bucket: $BUCKET_NAME"
+          echo "☁️ CloudFront ID: $DISTRIBUTION_ID"
+          echo "🌐 Website URL: $WEBSITE_URL"
 
-          # Sync container app files to root with metadata for caching
-          echo "Syncing container app to root..."
-          aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete --cache-control "public, max-age=60" --content-type "text/html" --exclude "*" --include "index.html" --include "404.html" || true
-          # Static assets with long cache
-          aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ --delete --exclude "index.html" --exclude "404.html" --cache-control "public, max-age=31536000, immutable"
-
-          # Sync all micro-frontend apps to their respective subdirectories
+      - name: Deploy to S3
+        id: deploy
+        run: |
+          BUCKET_NAME="${{ steps.infra.outputs.s3-bucket }}"
+          
+          if [ -z "$BUCKET_NAME" ]; then
+            echo "❌ No S3 bucket found. Infrastructure may not be deployed."
+            exit 1
+          fi
+          
+          echo "📦 Deploying to S3 bucket: $BUCKET_NAME"
+          
+          # Track if any files were changed
+          FILES_CHANGED=false
+          
+          # Deploy container app to root
+          if [ -d "apps/container/dist" ]; then
+            echo "📤 Syncing container app to root..."
+            # Check for changes before syncing
+            aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ \
+              --delete \
+              --cache-control "public, max-age=60" \
+              --exclude "*" \
+              --include "index.html" \
+              --include "404.html" \
+              --dryrun | grep -q "upload:\|delete:" && FILES_CHANGED=true
+            
+            aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ \
+              --delete \
+              --cache-control "public, max-age=60" \
+              --exclude "*" \
+              --include "index.html" \
+              --include "404.html"
+            
+            aws s3 sync apps/container/dist/ s3://$BUCKET_NAME/ \
+              --delete \
+              --exclude "index.html" \
+              --exclude "404.html" \
+              --cache-control "public, max-age=31536000, immutable"
+          fi
+          
+          # Deploy micro-frontends
           for app_dir in apps/*/; do
             app_name=$(basename "$app_dir")
-            # Skip container app (already synced to root) and e2e apps
             if [[ "$app_name" != "container" && "$app_name" != *"-e2e" ]]; then
-              if [[ -d "apps/$app_name/dist" ]]; then
-                echo "Syncing $app_name micro-frontend..."
-                aws s3 sync "apps/$app_name/dist/" "s3://$BUCKET_NAME/$app_name/" --cache-control "public, max-age=31536000, immutable"
+              if [ -d "apps/$app_name/dist" ]; then
+                echo "📤 Syncing $app_name micro-frontend..."
+                # Check for changes
+                aws s3 sync "apps/$app_name/dist/" "s3://$BUCKET_NAME/$app_name/" \
+                  --cache-control "public, max-age=31536000, immutable" \
+                  --dryrun | grep -q "upload:\|delete:" && FILES_CHANGED=true
+                
+                aws s3 sync "apps/$app_name/dist/" "s3://$BUCKET_NAME/$app_name/" \
+                  --cache-control "public, max-age=31536000, immutable"
               fi
             fi
           done
+          
+          echo "files-changed=$FILES_CHANGED" >> $GITHUB_OUTPUT
 
-      - name: Invalidate CloudFront Cache
+      - name: Invalidate CloudFront
+        if: steps.infra.outputs.cloudfront-id != '' && steps.deploy.outputs.files-changed == 'true'
         run: |
-          echo "🔄 Checking for CloudFront distribution..."
-          cd infra/terraform
-          terraform init \
-            -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" \
-            -backend-config="key=portfolio/${{ vars.STAGE }}/terraform.tfstate" \
-            -backend-config="region=${{ needs.common-env.outputs.aws_region }}" >/dev/null 2>&1 || true
-          DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "")
-          if [ ! -z "$DISTRIBUTION_ID" ] && [ "$DISTRIBUTION_ID" != "null" ]; then
-            echo "☁️ Found CloudFront distribution: $DISTRIBUTION_ID"
-            echo "🔄 Creating CloudFront invalidation..."
-            INVALIDATION_ID=$(aws cloudfront create-invalidation \
-              --distribution-id "$DISTRIBUTION_ID" \
-              --paths "/*" \
-              --query 'Invalidation.Id' \
-              --output text)
-            echo "✅ CloudFront invalidation created: $INVALIDATION_ID"
-          else
-            echo "ℹ️ No CloudFront distribution found - skipping cache invalidation"
-          fi
-
-      - name: Get website URL
-        id: get-url
+          DISTRIBUTION_ID="${{ steps.infra.outputs.cloudfront-id }}"
+          echo "🔄 Creating CloudFront invalidation for distribution: $DISTRIBUTION_ID"
+          
+          INVALIDATION_ID=$(aws cloudfront create-invalidation \
+            --distribution-id "$DISTRIBUTION_ID" \
+            --paths "/*" \
+            --query 'Invalidation.Id' \
+            --output text)
+          
+          echo "✅ CloudFront invalidation created: $INVALIDATION_ID"
+      
+      - name: Skip CloudFront Invalidation
+        if: steps.infra.outputs.cloudfront-id != '' && steps.deploy.outputs.files-changed != 'true'
         run: |
-          WEBSITE_URL="${{ needs.infrastructure.outputs.website-url }}"
-          if [ -z "$WEBSITE_URL" ]; then
-            BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
-            if [ -z "$BUCKET_NAME" ]; then
-              BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
-            fi
-            WEBSITE_URL="http://$BUCKET_NAME.s3-website-${{ needs.common-env.outputs.aws_region }}.amazonaws.com"
-          fi
-          echo "website-url=$WEBSITE_URL" >> $GITHUB_OUTPUT
+          echo "ℹ️ No files changed during deployment. Skipping CloudFront invalidation."
+          echo "💡 CloudFront will serve cached content until TTL expires."
 
       - name: Display deployment info
         run: |
           echo "🎉 Application deployment successful!"
-          echo "🌍 Environment: ${{ github.event.inputs.environment || 'Production' }}"
-          BUCKET_NAME="${{ needs.infrastructure.outputs.s3-bucket-name }}"
-          if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="${{ vars.S3_BUCKET_NAME }}-${{ vars.STAGE }}"
-          fi
-          echo "📦 App files synced to S3 bucket: $BUCKET_NAME"
-          echo "🌐 S3 Website URL: ${{ steps.get-url.outputs.website-url }}"
-          cd infra/terraform
-          terraform init -backend-config="bucket=${{ vars.S3_STATE_BUCKET_NAME }}" -backend-config="key=portfolio/${{ vars.STAGE }}/terraform.tfstate" -backend-config="region=${{ needs.common-env.outputs.aws_region }}" > /dev/null 2>&1 || true
-          HTTPS_URL=$(terraform output -raw https_website_url 2>/dev/null || echo "")
-          WWW_URL=$(terraform output -raw www_website_url 2>/dev/null || echo "")
-          if [ ! -z "$HTTPS_URL" ] && [ "$HTTPS_URL" != "null" ]; then
-            echo "🔒 Custom Domain: $HTTPS_URL"
-          fi
-          if [ ! -z "$WWW_URL" ] && [ "$WWW_URL" != "null" ]; then
-            echo "🔒 WWW Domain: $WWW_URL"
-          fi
-          CLOUDFRONT_DOMAIN=$(terraform output -raw cloudfront_domain_name 2>/dev/null || echo "")
-          if [ ! -z "$CLOUDFRONT_DOMAIN" ] && [ "$CLOUDFRONT_DOMAIN" != "null" ]; then
-            echo "☁️ CloudFront URL: https://$CLOUDFRONT_DOMAIN"
-          fi
+          echo "🌍 Environment: ${{ github.event.inputs.environment || 'dev' }}"
+          echo "📦 S3 Bucket: ${{ steps.infra.outputs.s3-bucket }}"
+          echo "☁️ CloudFront ID: ${{ steps.infra.outputs.cloudfront-id }}"
+          echo "🌐 Website URL: ${{ steps.infra.outputs.website-url }}"
