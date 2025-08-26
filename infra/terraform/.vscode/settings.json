@@ -1,0 +1,10 @@
+{
+  "terraform.languageServer": {
+    "args": [
+      "serve"
+    ]
+  },
+  "terraform.experimentalFeatures": {
+    "validateOnSave": true
+  }
+}
