@@ -1,5 +1,39 @@
 #!/bin/bash
 
+# Check if there are staged changes in apps/ or libs/ directories
+if git diff --cached --name-only | grep -qE "^(apps|libs)/"; then
+    echo "🔍 Detected changes in apps/ or libs/ - running code quality checks..."
+    
+    # Run nx lint for affected projects
+    echo "📝 Running nx lint on affected projects..."
+    if ! npx nx affected:lint --base=HEAD~1; then
+        echo "❌ Linting failed. Please fix the errors before committing."
+        exit 1
+    fi
+    echo "✅ Linting passed."
+    
+    # Run nx format:check for affected projects
+    echo "🎨 Checking code formatting..."
+    if ! npx nx format:check --base=HEAD~1; then
+        echo "❌ Code formatting issues found."
+        echo "💡 Run 'pnpm format' to fix formatting issues."
+        exit 1
+    fi
+    echo "✅ Code formatting check passed."
+    
+    # Run type checking if TypeScript files are changed
+    if git diff --cached --name-only | grep -qE "\.(ts|tsx)$"; then
+        echo "🔧 Running TypeScript type checking..."
+        if ! npx nx run-many --target=typecheck --all --parallel; then
+            echo "❌ TypeScript type checking failed. Please fix the errors before committing."
+            exit 1
+        fi
+        echo "✅ TypeScript type checking passed."
+    fi
+    
+    echo "✨ All code quality checks complete."
+fi
+
 # Check if there are staged changes in the infra/terraform directory
 if git diff --cached --name-only | grep -q "^infra/terraform/"; then
     echo "🔍 Detected changes in infra/terraform - running terraform checks..."

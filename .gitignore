@@ -49,6 +49,16 @@ out
 
 test-output
 
+# security scanning
+.cache_ggshield
+.ggshield*
+
+# Sensitive files
+*.pem
+*.key
+.env.local
+.env.*.local
+
 vite.config.*.timestamp*
 vitest.config.*.timestamp*
 

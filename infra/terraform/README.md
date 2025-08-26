@@ -1,309 +1,233 @@
-# AWS Deployment for thommf-portfolio
+# Terraform Infrastructure v2
 
-This directory contains Terraform configuration to deploy your portfolio website to AWS using S3 for static hosting and CloudFront for global CDN distribution.
+This is a modular Terraform infrastructure setup for deploying static websites with CloudFront and S3, designed to replace the problematic setup in `infra/terraform`.
+
+## Features
+
+- **Modular Architecture**: Separate modules for S3, CloudFront, Route53, and IAM
+- **Multi-Environment Support**: dev, staging, prod environments with subdomains
+- **CI/CD Ready**: GitHub Actions integration with OIDC
+- **State Management**: Remote state in S3 with DynamoDB locking
+- **Security**: Principle of least privilege IAM policies
+- **Cost Optimized**: Uses CloudFront PriceClass_100 and efficient S3 configuration
 
 ## Architecture
 
-- **S3 Bucket**: Hosts your static website files
-- **CloudFront Distribution**: Provides global CDN with caching and HTTPS
-- **IAM Policy & User**: Restricted deployment user with tag-based access control
-- **Route 53** (Optional): DNS management for custom domains
-- **ACM Certificate** (Optional): SSL/TLS certificate for custom domains
-
-## Security
-
-This Terraform configuration enforces secure deployment practices:
-
-### 🔒 **Tag-Based Access Control**
-All resources **must** be tagged with `Environment=frontend` to work with the restricted IAM policy:
-- S3 buckets: Tagged with `Environment=frontend`
-- CloudFront distributions: Tagged with `Environment=frontend`
-- No naming restrictions required
-
-### 🛡️ **IAM Policy Enforcement**
-The deployer user has minimal permissions and can only:
-- ✅ Manage AWS resources tagged with `Environment=frontend`
-- ✅ Read Route 53 and ACM resources
-- ❌ Access any resources without the proper tag
-- ❌ Access any other AWS services
-
-### 📋 **Security Checklist**
-Before deploying, ensure:
-- [ ] `environment` is set to your deployment environment ("prod", "dev", etc.) in terraform.tfvars
-- [ ] `resource_tag_environment` is set to "frontend" in terraform.tfvars
-- [ ] All resources will be tagged with `Environment=frontend`
-- [ ] IAM user follows least-privilege principles
-
-For complete security setup, see [GitHub DEPLOYMENT.md](../../.github/DEPLOYMENT.md).
+```
+thomfilg.com (manually managed)
+├── dev.thomfilg.com     → CloudFront → S3
+├── staging.thomfilg.com → CloudFront → S3
+└── www.thomfilg.com     → CloudFront → S3 (prod)
+```
 
 ## Prerequisites
 
-Before deploying, ensure you have:
+1. **Domain Setup**: `thomfilg.com` must be registered and have a Route53 hosted zone
+2. **S3 Backend**: `requisition-terraform-state` bucket must exist
+3. **DynamoDB Table**: `terraform-locks` table for state locking (optional but recommended)
+4. **GitHub OIDC**: AWS IAM OIDC provider for GitHub Actions (for CI/CD)
 
-1. **AWS CLI** installed and configured with appropriate permissions
-2. **Terraform** (>= 1.0) installed
-3. **Node.js** and **pnpm** (or npm) installed
-4. AWS account with the following permissions:
-   - S3 (CreateBucket, PutObject, etc.)
-   - CloudFront (CreateDistribution, etc.)
-   - Route 53 (if using custom domain)
-   - ACM (if using custom domain)
+## Project Structure
 
-## Quick Start
-
-### 1. Configure AWS CLI
-
-```bash
-aws configure
+```
+infra/terraform/
+├── modules/
+│   ├── s3-website/      # S3 bucket for static hosting
+│   ├── cloudfront/      # CloudFront distribution and SSL
+│   ├── route53/         # DNS records for subdomains
+│   └── iam/             # Deployment permissions
+├── environments/
+│   ├── dev/
+│   │   ├── terraform.tfvars    # Environment-specific variables
+│   │   └── backend.tfvars       # Backend configuration for state management
+│   ├── staging/
+│   │   ├── terraform.tfvars
+│   │   └── backend.tfvars
+│   └── prod/
+│       ├── terraform.tfvars
+│       └── backend.tfvars
+├── backend.tf           # Backend configuration template
+├── main.tf              # Main module composition
+├── variables.tf         # Input variables
+└── outputs.tf           # Output values
 ```
 
-Enter your AWS Access Key ID, Secret Access Key, and preferred region.
+## Configuration Management
 
-### 2. Configure Terraform Variables
+### Configuration Approach
 
-Copy the example variables file and customize it:
+#### 1. Environment-Specific Variables (`terraform.tfvars`)
 
-```bash
-cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars
-```
+Each environment has its own `terraform.tfvars` file containing environment-specific values:
 
-Edit `infra/terraform/terraform.tfvars` and update:
+- `environment`: Environment name (dev, staging, prod)
+- `domain_name`: Root domain name
+- `subdomain`: Environment-specific subdomain
+- `project_name`: Project identifier
+- `aws_region`: AWS region for resources
+- `github_repo`: GitHub repository for CI/CD integration
+- `create_deployment_user`: Whether to create IAM user for deployment
+
+#### 2. Backend Configuration (`backend.tfvars`)
+
+Each environment has a separate backend configuration file for state management:
 
 ```hcl
-# REQUIRED: Change this to a globally unique bucket name
-bucket_name = "your-unique-bucket-name-12345"
-
-# REQUIRED: Must be 'frontend' for IAM policy compliance
-resource_tag_environment = "frontend"
-
-# Deployment environment
-environment = "prod"
-
-# IAM Configuration
-frontend_deployer_username = "frontend-deployer"
-create_access_keys = false  # Set to true only for testing
-
-# OPTIONAL: Configure custom domain
-# domain_names = ["yourdomain.com"]
-# ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
-# hosted_zone_id = "Z123456789012345678901"
+bucket = "requisition-terraform-state"
+key    = "environments/{environment}/terraform.tfstate"
+region = "us-east-1"
+encrypt = true
+# dynamodb_table = "terraform-locks"  # Uncomment when DynamoDB table is created
 ```
 
-### 3. Deploy Infrastructure
+#### 3. State Locking (Optional)
 
-Run the deployment script:
+State locking via DynamoDB is currently disabled to avoid costs. To enable:
 
-```bash
-pnpm run deploy
-# or
-./infra/deploy.sh
-```
+1. Create a DynamoDB table named `terraform-locks` with a primary key `LockID` (string)
+2. Uncomment the `dynamodb_table` line in all `backend.tfvars` files
+3. Uncomment the same line in `backend.tf`
 
-This will:
-1. Install dependencies
-2. Build the project (with module federation micro-frontends)
-3. Deploy AWS infrastructure
-4. Upload files to S3
-5. Invalidate CloudFront cache
+### Benefits of This Approach
 
-## Manual Deployment Steps
+1. **Consistency**: All configuration is centralized in version-controlled files
+2. **Clarity**: Clear separation between environments
+3. **Maintainability**: Easy to add new environments or modify existing ones
+4. **Security**: No sensitive values in workflow files
+5. **Testability**: Developers can easily test with the same configuration locally
 
-If you prefer to run each step manually:
+## Usage
 
-### 1. Build the Project
+### Local Development
 
 ```bash
-pnpm install
-pnpm run build
-```
-
-### 2. Deploy Infrastructure
-
-```bash
+# Navigate to terraform directory
 cd infra/terraform
-terraform init
-terraform plan
-terraform apply
+
+# Initialize for a specific environment
+terraform init -backend-config=environments/dev/backend.tfvars
+
+# Plan changes
+terraform plan -var-file=environments/dev/terraform.tfvars
+
+# Apply changes
+terraform apply -var-file=environments/dev/terraform.tfvars
 ```
 
-### 3. Upload Files
+## CI/CD Setup
 
-```bash
-# Get bucket name from Terraform output
-BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+### GitHub Secrets Required
 
-# Upload files
-aws s3 sync ../apps/container/dist/ s3://$BUCKET_NAME/ --delete
+1. `AWS_TERRAFORM_ROLE_ARN`: IAM role ARN for GitHub Actions OIDC
 
-# Invalidate CloudFront cache
-CLOUDFRONT_ID=$(terraform output -raw cloudfront_distribution_id)
-aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_ID --paths "/*"
-```
+### Workflow Behavior
 
-## Configuration Options
+- **Pull Requests**: Runs `terraform plan` for dev and staging environments
+- **Main Branch**: Auto-deploys dev environment only
+- **Manual**: Staging and prod require manual deployment
 
-### Variables
+### CI/CD Workflows
 
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `aws_region` | AWS region for resources | `us-east-1` | No |
-| `bucket_name` | S3 bucket name (must be globally unique) | - | Yes |
-| `environment` | Deployment environment (prod, dev, staging) | `prod` | No |
-| `resource_tag_environment` | Environment tag for resources (must be 'frontend') | `frontend` | No |
-| `domain_names` | Custom domain names | `[]` | No |
-| `ssl_certificate_arn` | ACM certificate ARN | `null` | No* |
-| `hosted_zone_id` | Route 53 hosted zone ID | `null` | No* |
-| `cloudfront_price_class` | CloudFront price class | `PriceClass_100` | No |
-| `static_asset_cache_patterns` | File patterns for long-term caching | `["*.css", "*.js", "*.png", ...]` | No |
-| `github_repository` | GitHub repository for OIDC (format: owner/repo) | - | Yes |
-| `frontend_deployer_username` | Username for the deployer role | `frontend-deployer` | No |
+The GitHub Actions workflows automatically use the appropriate configuration files based on the environment:
 
-*Required if using custom domain
+1. **deploy-infra.yml**: Handles infrastructure deployment
+   - Uses `backend.tfvars` for state configuration
+   - Uses `terraform.tfvars` for environment variables
 
-### CloudFront Price Classes
+2. **deploy-app-simple.yml**: Handles application deployment
+   - Retrieves infrastructure outputs using the same backend configuration
 
-- `PriceClass_All`: All edge locations (highest cost, best performance)
-- `PriceClass_200`: North America, Europe, Asia, Middle East, and Africa
-- `PriceClass_100`: North America and Europe only (lowest cost)
+### Setting up GitHub OIDC
 
-### Authentication
-
-This Terraform configuration uses **OIDC (OpenID Connect)** for secure GitHub Actions authentication:
-
-- ✅ **Secure**: No long-lived AWS access keys
-- ✅ **Modern**: Uses temporary, automatically-expiring credentials
-- ✅ **Auditable**: AWS CloudTrail shows GitHub context
-- ✅ **Repository-scoped**: Only your specific GitHub repository can assume the role
-
-**📋 [OIDC Setup Guide →](../../docs/OIDC_SETUP.md)**
-
-## Custom Domain Setup
-
-To use a custom domain:
-
-1. **Get an SSL Certificate** from AWS Certificate Manager (ACM):
-   - Go to ACM in the AWS Console
-   - Request a public certificate for your domain
-   - Validate domain ownership
-   - Note the certificate ARN
-
-2. **Set up Route 53** (if not already done):
-   - Create a hosted zone for your domain
-   - Note the hosted zone ID
-
-3. **Update terraform.tfvars**:
-   ```hcl
-   domain_names = ["yourdomain.com", "www.yourdomain.com"]
-   ssl_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
-   hosted_zone_id = "Z123456789012345678901"
-   ```
-
-4. **Deploy**:
+1. Create GitHub OIDC provider in AWS (once per account):
    ```bash
-   ./deploy.sh
+   aws iam create-open-id-connect-provider \
+     --url https://token.actions.githubusercontent.com \
+     --client-id-list sts.amazonaws.com \
+     --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
    ```
 
-## Updating Your Website
+2. Create IAM role for GitHub Actions with trust policy allowing your repository
 
-To update your website content:
+3. Add the role ARN to GitHub Secrets as `AWS_TERRAFORM_ROLE_ARN`
 
-1. **Build the project**:
-   ```bash
-   pnpm run build
-   ```
+## Module Details
 
-2. **Upload files**:
-   ```bash
-   ./infra/deploy.sh upload-only
-   ```
+### S3 Website Module
+- Creates encrypted S3 bucket with versioning
+- Configures bucket policy for CloudFront access
+- Uploads default index.html
 
-Or manually:
-```bash
-aws s3 sync apps/container/dist/ s3://your-bucket-name/ --delete
-aws cloudfront create-invalidation --distribution-id YOUR_DISTRIBUTION_ID --paths "/*"
-```
+### CloudFront Module
+- Creates Origin Access Control (OAC) for S3 access
+- Generates ACM certificate for HTTPS
+- Configures caching and error pages for SPA routing
 
-## Useful Commands
+### Route53 Module
+- Creates subdomain A records pointing to CloudFront
+- Manages certificate validation DNS records
+- Looks up existing Route53 hosted zone
 
-### View Terraform Outputs
-
-```bash
-cd infra/terraform
-terraform output
-```
-
-### Check Website Status
-
-```bash
-# Check if website is accessible
-curl -I https://your-cloudfront-domain.cloudfront.net
-
-# Check custom domain (if configured)
-curl -I https://yourdomain.com
-```
-
-### Clean Up Resources
-
-To destroy all AWS resources:
-
-```bash
-cd infra/terraform
-terraform destroy
-```
-
-**Warning**: This will permanently delete your S3 bucket and all files!
+### IAM Module
+- Creates GitHub Actions role with OIDC trust policy
+- Provides minimal S3 and CloudFront permissions
+- Optional IAM user creation for alternative access
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Bucket name already exists**:
-   - S3 bucket names must be globally unique
-   - Change `bucket_name` in `terraform.tfvars`
+1. **Certificate Validation**: ACM certificates in us-east-1 require DNS validation
+2. **Route53 Zone**: Ensure `thomfilg.com` hosted zone exists before running
+3. **State Conflicts**: Use different usernames or environments to avoid conflicts
+4. **OIDC Setup**: GitHub OIDC provider must be created once per AWS account
 
-2. **Access denied errors**:
-   - Check AWS CLI configuration
-   - Ensure your AWS user has necessary permissions
+### Manual Certificate Validation
 
-3. **Website not loading**:
-   - CloudFront deployment takes 10-15 minutes
-   - Check CloudFront distribution status in AWS Console
+If automatic DNS validation fails:
 
-4. **Custom domain not working**:
-   - Verify SSL certificate is issued and validated
-   - Check Route 53 DNS propagation
-   - Ensure certificate is in `us-east-1` region
+1. Check Route53 records were created properly
+2. Wait for DNS propagation (up to 48 hours)
+3. Validate manually in ACM console
 
-### Logs and Monitoring
+### State Recovery
 
-- **CloudFront Access Logs**: Can be enabled in the distribution settings
-- **S3 Access Logs**: Can be enabled in bucket settings
-- **AWS CloudTrail**: For API call auditing
+If state becomes corrupted:
+
+1. **Backup**: Export current state: `terraform show -json > backup.json`
+2. **Import**: Re-import resources if needed
+3. **Clean**: Remove locks: `aws dynamodb delete-item --table-name terraform-locks --key '{"LockID":{"S":"<lock-id>"}}'`
+
+## Adding a New Environment
+
+To add a new environment (e.g., `qa`):
+
+1. Create directory: `environments/qa/`
+2. Create `terraform.tfvars` with environment-specific values
+3. Create `backend.tfvars` with state configuration
+4. Update CI/CD workflows to include the new environment in the matrix
+
+## Migration from v1
+
+To migrate from `infra/terraform`:
+
+1. Export existing resources
+2. Deploy new environment with different subdomain
+3. Test thoroughly
+4. Update DNS records
+5. Destroy old infrastructure
 
 ## Cost Estimation
 
-Typical monthly costs for a portfolio website:
+Per environment (monthly):
+- S3 storage: ~$0.50 (assuming 1GB)
+- CloudFront: ~$1.00 (first 1TB free tier)
+- Route53 queries: ~$0.50
+- **Total: ~$2.00/month per environment**
 
-- **S3 Storage**: $0.023/GB (first 50TB)
-- **S3 Requests**: $0.0004/1000 GET requests
-- **CloudFront**: $0.085/GB for first 10TB
-- **Route 53**: $0.50/hosted zone + $0.40/1M queries
+## Security Considerations
 
-For a typical portfolio site: **~$1-5/month**
-
-## Terraform Configuration Features
-
-### Dynamic Cache Behaviors
-The CloudFront distribution uses dynamic blocks to reduce code duplication:
-- **Before**: Multiple nearly identical `ordered_cache_behavior` blocks for each file type
-- **After**: Single dynamic block with `for_each` over `static_asset_cache_patterns`
-- **Benefits**: 
-  - Easier to maintain and update
-  - Simple to add new file types
-  - Consistent caching configuration
-  - Reduced chance of configuration drift
-
-To customize static asset caching, override `static_asset_cache_patterns` in your `terraform.tfvars`:
-```hcl
-static_asset_cache_patterns = ["*.css", "*.js", "*.png", "*.jpg", "*.svg", "*.woff2"]
-```
+- S3 buckets are private with CloudFront-only access
+- IAM roles follow principle of least privilege
+- All traffic uses HTTPS with modern TLS
+- State files are encrypted in S3

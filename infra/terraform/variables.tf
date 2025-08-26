@@ -1,108 +1,38 @@
+variable "environment" {
+  description = "Environment name (dev, staging, prod)"
+  type        = string
+}
+
 variable "aws_region" {
-  description = "AWS region for resources (S3, CloudFront, etc.)"
+  description = "AWS region for resources"
   type        = string
   default     = "us-east-1"
 }
 
-variable "bucket_name" {
-  description = "Name of the S3 bucket for hosting the static website (must be globally unique)"
-  type        = string
-}
-
-variable "environment" {
-  description = "Deployment environment (prod, dev, staging, etc.)"
-  type        = string
-  default     = "prod"
-}
-
-variable "resource_tag_environment" {
-  description = "Environment tag value for resources (recommended: 'frontend' for IAM policy compliance)"
-  type        = string
-  default     = "frontend"
-}
-
-variable "tags" {
-  description = "Additional tags to apply to all resources"
-  type        = map(string)
-  default     = {}
-}
-
-# IAM & GitHub OIDC
-variable "frontend_deployer_username" {
-  description = "Username for the frontend deployer role"
-  type        = string
-  default     = "frontend-deployer"
-}
-
-variable "create_iam_resources" {
-  description = "Whether to create IAM policy and role (set to false if they already exist)"
-  type        = bool
-  default     = true
-}
-
-variable "use_oidc" {
-  description = "Whether to use OIDC for GitHub Actions authentication instead of access keys"
-  type        = bool
-  default     = true
-}
-
-variable "github_repository" {
-  description = "GitHub repository in the format 'owner/repo' for OIDC authentication"
-  type        = string
-  validation {
-    condition     = can(regex("^[a-zA-Z0-9._-]+/[a-zA-Z0-9._-]+$", var.github_repository))
-    error_message = "github_repository must be in the format 'owner/repo' (e.g., 'username/my-repo')."
-  }
-}
-
-# Domain configuration
 variable "domain_name" {
-  description = "The primary domain name (e.g., thomfilg.com)"
+  description = "Root domain name (e.g., thomfilg.com)"
   type        = string
-  default     = "" # Made optional
 }
 
-variable "subdomain_names" {
-  description = "List of subdomains to include in the SSL certificate and CloudFront aliases"
-  type        = list(string)
-  default     = [] # Empty default
-
-  validation {
-    condition = alltrue([
-      for domain in var.subdomain_names :
-      domain == "" || can(regex("^[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", domain))
-    ])
-    error_message = "All subdomain names must be valid domain names."
-  }
-}
-
-variable "hosted_zone_id" {
-  description = "Route 53 hosted zone ID. If provided, will be used instead of looking up by domain name."
+variable "subdomain" {
+  description = "Subdomain prefix (e.g., dev, staging)"
   type        = string
-  default     = ""
 }
 
-# SSL Certificate and CloudFront Configuration
-variable "create_ssl_certificate" {
-  description = "Whether to create an SSL certificate for the domain"
-  type        = bool
-  default     = false # Default to false since domain is optional
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+  default     = "thomfilg-portfolio"
 }
 
-variable "create_cloudfront_distribution" {
-  description = "Whether to create a CloudFront distribution"
-  type        = bool
-  default     = true
+variable "github_repo" {
+  description = "GitHub repository for CI/CD integration"
+  type        = string
+  default     = "tigredonorte/thommf-portfolio"
 }
 
-variable "create_route53_records" {
-  description = "Whether to create Route53 records pointing to CloudFront"
-  type        = bool
-  default     = false
-}
-
-variable "create_shared_resources" {
-  description = "Whether to create shared resources (Route53, ACM cert) or use existing ones"
+variable "create_deployment_user" {
+  description = "Whether to create IAM user for deployment"
   type        = bool
   default     = false
 }
