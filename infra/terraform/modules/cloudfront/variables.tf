@@ -11,6 +11,13 @@ variable "environment" {
 variable "domain_name" {
   description = "Domain name for the CloudFront distribution"
   type        = string
+  default     = ""
+}
+
+variable "domain_aliases" {
+  description = "List of domain aliases for the CloudFront distribution"
+  type        = list(string)
+  default     = []
 }
 
 variable "s3_bucket_id" {

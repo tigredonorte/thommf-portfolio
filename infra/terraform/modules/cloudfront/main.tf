@@ -21,7 +21,7 @@ resource "aws_cloudfront_distribution" "website" {
   default_root_object = "index.html"
   comment             = "${var.project_name} ${var.environment} distribution"
 
-  aliases = var.certificate_arn != "" ? [var.domain_name] : []
+  aliases = var.certificate_arn != "" ? var.domain_aliases : []
 
   origin {
     domain_name              = var.s3_bucket_domain_name

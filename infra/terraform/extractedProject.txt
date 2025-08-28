@@ -1,0 +1,1080 @@
+===== extractedProject.txt =====
+
+===== .terraform.lock.hcl =====
+# This file is maintained automatically by "terraform init".
+# Manual edits may be lost in future updates.
+
+provider "registry.terraform.io/hashicorp/aws" {
+  version     = "5.100.0"
+  constraints = "~> 5.0"
+  hashes = [
+    "h1:Ijt7pOlB7Tr7maGQIqtsLFbl7pSMIj06TVdkoSBcYOw=",
+    "h1:edXOJWE4ORX8Fm+dpVpICzMZJat4AX0VRCAy/xkcOc0=",
+    "h1:hd45qFU5cFuJMpFGdUniU9mVIr5LYVWP1uMeunBpYYs=",
+    "zh:054b8dd49f0549c9a7cc27d159e45327b7b65cf404da5e5a20da154b90b8a644",
+    "zh:0b97bf8d5e03d15d83cc40b0530a1f84b459354939ba6f135a0086c20ebbe6b2",
+    "zh:1589a2266af699cbd5d80737a0fe02e54ec9cf2ca54e7e00ac51c7359056f274",
+    "zh:6330766f1d85f01ae6ea90d1b214b8b74cc8c1badc4696b165b36ddd4cc15f7b",
+    "zh:7c8c2e30d8e55291b86fcb64bdf6c25489d538688545eb48fd74ad622e5d3862",
+    "zh:99b1003bd9bd32ee323544da897148f46a527f622dc3971af63ea3e251596342",
+    "zh:9b12af85486a96aedd8d7984b0ff811a4b42e3d88dad1a3fb4c0b580d04fa425",
+    "zh:9f8b909d3ec50ade83c8062290378b1ec553edef6a447c56dadc01a99f4eaa93",
+    "zh:aaef921ff9aabaf8b1869a86d692ebd24fbd4e12c21205034bb679b9caf883a2",
+    "zh:ac882313207aba00dd5a76dbd572a0ddc818bb9cbf5c9d61b28fe30efaec951e",
+    "zh:bb64e8aff37becab373a1a0cc1080990785304141af42ed6aa3dd4913b000421",
+    "zh:dfe495f6621df5540d9c92ad40b8067376350b005c637ea6efac5dc15028add4",
+    "zh:f0ddf0eaf052766cfe09dea8200a946519f653c384ab4336e2a4a64fdd6310e9",
+    "zh:f1b7e684f4c7ae1eed272b6de7d2049bb87a0275cb04dbb7cda6636f600699c9",
+    "zh:ff461571e3f233699bf690db319dfe46aec75e58726636a0d97dd9ac6e32fb70",
+  ]
+}
+
+===== .tflint.hcl =====
+plugin "terraform" {
+  enabled = true
+  preset  = "recommended"
+}
+
+plugin "aws" {
+  enabled = true
+  version = "0.36.0"
+  source  = "github.com/terraform-linters/tflint-ruleset-aws"
+}
+
+rule "terraform_required_version" {
+  enabled = true
+}
+
+rule "terraform_required_providers" {
+  enabled = true
+}
+
+rule "terraform_module_pinned_source" {
+  enabled = true
+}
+
+rule "terraform_naming_convention" {
+  enabled = true
+}
+
+rule "terraform_unused_declarations" {
+  enabled = true
+}
+===== .vscode/settings.json =====
+{
+  "terraform.languageServer": {
+    "args": [
+      "serve"
+    ]
+  },
+  "terraform.experimentalFeatures": {
+    "validateOnSave": true
+  }
+}
+
+===== README.md =====
+# Terraform Infrastructure v2
+
+This is a modular Terraform infrastructure setup for deploying static websites with CloudFront and S3, designed to replace the problematic setup in `infra/terraform`.
+
+## Features
+
+- **Modular Architecture**: Separate modules for S3, CloudFront, Route53, and IAM
+- **Multi-Environment Support**: dev, staging, prod environments with subdomains
+- **CI/CD Ready**: GitHub Actions integration with OIDC
+- **State Management**: Remote state in S3 with DynamoDB locking
+- **Security**: Principle of least privilege IAM policies
+- **Cost Optimized**: Uses CloudFront PriceClass_100 and efficient S3 configuration
+
+## Architecture
+
+```
+thomfilg.com (manually managed)
+├── dev.thomfilg.com     → CloudFront → S3
+├── staging.thomfilg.com → CloudFront → S3
+└── www.thomfilg.com     → CloudFront → S3 (prod)
+```
+
+## Prerequisites
+
+1. **Domain Setup**: `thomfilg.com` must be registered and have a Route53 hosted zone
+2. **S3 Backend**: `requisition-terraform-state` bucket must exist
+3. **DynamoDB Table**: `terraform-locks` table for state locking (optional but recommended)
+4. **GitHub OIDC**: AWS IAM OIDC provider for GitHub Actions (for CI/CD)
+
+## Project Structure
+
+```
+infra/terraform/
+├── modules/
+│   ├── s3-website/      # S3 bucket for static hosting
+│   ├── cloudfront/      # CloudFront distribution and SSL
+│   ├── route53/         # DNS records for subdomains
+│   └── iam/             # Deployment permissions
+├── environments/
+│   ├── dev/
+│   │   ├── terraform.tfvars    # Environment-specific variables
+│   │   └── backend.tfvars       # Backend configuration for state management
+│   ├── staging/
+│   │   ├── terraform.tfvars
+│   │   └── backend.tfvars
+│   └── prod/
+│       ├── terraform.tfvars
+│       └── backend.tfvars
+├── backend.tf           # Backend configuration template
+├── main.tf              # Main module composition
+├── variables.tf         # Input variables
+└── outputs.tf           # Output values
+```
+
+## Configuration Management
+
+### Configuration Approach
+
+#### 1. Environment-Specific Variables (`terraform.tfvars`)
+
+Each environment has its own `terraform.tfvars` file containing environment-specific values:
+
+- `environment`: Environment name (dev, staging, prod)
+- `domain_name`: Root domain name
+- `subdomain`: Environment-specific subdomain
+- `project_name`: Project identifier
+- `aws_region`: AWS region for resources
+- `github_repo`: GitHub repository for CI/CD integration
+- `create_deployment_user`: Whether to create IAM user for deployment
+
+#### 2. Backend Configuration (`backend.tfvars`)
+
+Each environment has a separate backend configuration file for state management:
+
+```hcl
+bucket = "requisition-terraform-state"
+key    = "environments/{environment}/terraform.tfstate"
+region = "us-east-1"
+encrypt = true
+# dynamodb_table = "terraform-locks"  # Uncomment when DynamoDB table is created
+```
+
+#### 3. State Locking (Optional)
+
+State locking via DynamoDB is currently disabled to avoid costs. To enable:
+
+1. Create a DynamoDB table named `terraform-locks` with a primary key `LockID` (string)
+2. Uncomment the `dynamodb_table` line in all `backend.tfvars` files
+3. Uncomment the same line in `backend.tf`
+
+### Benefits of This Approach
+
+1. **Consistency**: All configuration is centralized in version-controlled files
+2. **Clarity**: Clear separation between environments
+3. **Maintainability**: Easy to add new environments or modify existing ones
+4. **Security**: No sensitive values in workflow files
+5. **Testability**: Developers can easily test with the same configuration locally
+
+## Usage
+
+### Local Development
+
+```bash
+# Navigate to terraform directory
+cd infra/terraform
+
+# Initialize for a specific environment
+terraform init -backend-config=environments/dev/backend.tfvars
+
+# Plan changes
+terraform plan -var-file=environments/dev/terraform.tfvars
+
+# Apply changes
+terraform apply -var-file=environments/dev/terraform.tfvars
+```
+
+## CI/CD Setup
+
+### GitHub Secrets Required
+
+1. `AWS_TERRAFORM_ROLE_ARN`: IAM role ARN for GitHub Actions OIDC
+
+### Workflow Behavior
+
+- **Pull Requests**: Runs `terraform plan` for dev and staging environments
+- **Main Branch**: Auto-deploys dev environment only
+- **Manual**: Staging and prod require manual deployment
+
+### CI/CD Workflows
+
+The GitHub Actions workflows automatically use the appropriate configuration files based on the environment:
+
+1. **deploy-infra.yml**: Handles infrastructure deployment
+   - Uses `backend.tfvars` for state configuration
+   - Uses `terraform.tfvars` for environment variables
+
+2. **deploy-app-simple.yml**: Handles application deployment
+   - Retrieves infrastructure outputs using the same backend configuration
+
+### Setting up GitHub OIDC
+
+1. Create GitHub OIDC provider in AWS (once per account):
+   ```bash
+   aws iam create-open-id-connect-provider \
+     --url https://token.actions.githubusercontent.com \
+     --client-id-list sts.amazonaws.com \
+     --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+   ```
+
+2. Create IAM role for GitHub Actions with trust policy allowing your repository
+
+3. Add the role ARN to GitHub Secrets as `AWS_TERRAFORM_ROLE_ARN`
+
+## Module Details
+
+### S3 Website Module
+- Creates encrypted S3 bucket with versioning
+- Configures bucket policy for CloudFront access
+- Uploads default index.html
+
+### CloudFront Module
+- Creates Origin Access Control (OAC) for S3 access
+- Generates ACM certificate for HTTPS
+- Configures caching and error pages for SPA routing
+
+### Route53 Module
+- Creates subdomain A records pointing to CloudFront
+- Manages certificate validation DNS records
+- Looks up existing Route53 hosted zone
+
+### IAM Module
+- Creates GitHub Actions role with OIDC trust policy
+- Provides minimal S3 and CloudFront permissions
+- Optional IAM user creation for alternative access
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Certificate Validation**: ACM certificates in us-east-1 require DNS validation
+2. **Route53 Zone**: Ensure `thomfilg.com` hosted zone exists before running
+3. **State Conflicts**: Use different usernames or environments to avoid conflicts
+4. **OIDC Setup**: GitHub OIDC provider must be created once per AWS account
+
+### Manual Certificate Validation
+
+If automatic DNS validation fails:
+
+1. Check Route53 records were created properly
+2. Wait for DNS propagation (up to 48 hours)
+3. Validate manually in ACM console
+
+### State Recovery
+
+If state becomes corrupted:
+
+1. **Backup**: Export current state: `terraform show -json > backup.json`
+2. **Import**: Re-import resources if needed
+3. **Clean**: Remove locks: `aws dynamodb delete-item --table-name terraform-locks --key '{"LockID":{"S":"<lock-id>"}}'`
+
+## Adding a New Environment
+
+To add a new environment (e.g., `qa`):
+
+1. Create directory: `environments/qa/`
+2. Create `terraform.tfvars` with environment-specific values
+3. Create `backend.tfvars` with state configuration
+4. Update CI/CD workflows to include the new environment in the matrix
+
+## Migration from v1
+
+To migrate from `infra/terraform`:
+
+1. Export existing resources
+2. Deploy new environment with different subdomain
+3. Test thoroughly
+4. Update DNS records
+5. Destroy old infrastructure
+
+## Cost Estimation
+
+Per environment (monthly):
+- S3 storage: ~$0.50 (assuming 1GB)
+- CloudFront: ~$1.00 (first 1TB free tier)
+- Route53 queries: ~$0.50
+- **Total: ~$2.00/month per environment**
+
+## Security Considerations
+
+- S3 buckets are private with CloudFront-only access
+- IAM roles follow principle of least privilege
+- All traffic uses HTTPS with modern TLS
+- State files are encrypted in S3
+===== backend.tf =====
+terraform {
+  backend "s3" {
+    bucket  = "requisition-terraform-state"
+    region  = "us-east-1"
+    encrypt = true
+    # dynamodb_table = "terraform-locks"  # Uncomment when table is created
+
+    # Key will be set via -backend-config or environment variables
+    # Format: environments/{environment}/terraform.tfstate
+    # For local dev: environments/{environment}-{username}/terraform.tfstate
+  }
+
+  required_version = ">= 1.0"
+
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project     = "thomfilg-portfolio"
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    }
+  }
+}
+
+# Provider for us-east-1 (required for CloudFront certificates)
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+
+  default_tags {
+    tags = {
+      Project     = "thomfilg-portfolio"
+      Environment = var.environment
+      ManagedBy   = "terraform"
+    }
+  }
+}
+===== environments/dev/backend.tfvars =====
+# Backend configuration for dev environment
+bucket  = "thomfilg-terraform-state"
+key     = "environments/dev/terraform.tfstate"
+region  = "us-east-1"
+encrypt = true
+# dynamodb_table = "terraform-locks"  # Uncomment when DynamoDB table is created for state locking
+===== environments/dev/terraform.tfvars =====
+environment            = "dev"
+domain_name            = "thomfilg.com"
+subdomain              = "dev"
+project_name           = "thomfilg-portfolio"
+aws_region             = "us-east-1"
+github_repo            = "tigredonorte/thommf-portfolio"
+create_deployment_user = false
+# Deploy test enabled for PR testing
+===== environments/prod/backend.tfvars =====
+# Backend configuration for prod environment
+bucket  = "thomfilg-terraform-state"
+key     = "environments/prod/terraform.tfstate"
+region  = "us-east-1"
+encrypt = true
+# dynamodb_table = "terraform-locks"  # Uncomment when DynamoDB table is created for state locking
+===== environments/prod/terraform.tfvars =====
+environment            = "prod"
+domain_name            = "thomfilg.com"
+subdomain              = "www"
+project_name           = "thomfilg-portfolio"
+aws_region             = "us-east-1"
+github_repo            = "tigredonorte/thommf-portfolio"
+create_deployment_user = false
+===== environments/staging/backend.tfvars =====
+# Backend configuration for staging environment
+bucket  = "thomfilg-terraform-state"
+key     = "environments/staging/terraform.tfstate"
+region  = "us-east-1"
+encrypt = true
+# dynamodb_table = "terraform-locks"  # Uncomment when DynamoDB table is created for state locking
+===== environments/staging/terraform.tfvars =====
+environment            = "staging"
+domain_name            = "thomfilg.com"
+subdomain              = "staging"
+project_name           = "thomfilg-portfolio"
+aws_region             = "us-east-1"
+github_repo            = "tigredonorte/thommf-portfolio"
+create_deployment_user = false
+===== main.tf =====
+locals {
+  full_domain = "${var.subdomain}.${var.domain_name}"
+
+  # For prod, we want both root and www; for others, just the subdomain
+  domain_aliases = var.environment == "prod" ? [
+    var.domain_name,           # thomfilg.com
+    local.full_domain          # www.thomfilg.com
+  ] : [local.full_domain]      # dev.thomfilg.com or staging.thomfilg.com
+}
+
+# Create S3 bucket first (without policy)
+module "s3_website" {
+  source = "./modules/s3-website"
+
+  project_name = var.project_name
+  environment  = var.environment
+  # CloudFront ARN not needed here - bucket policy is managed separately below
+}
+
+# Get Route53 zone
+data "aws_route53_zone" "main" {
+  name         = var.domain_name
+  private_zone = false
+}
+
+# Create ACM certificate for CloudFront (must be in us-east-1)
+resource "aws_acm_certificate" "website" {
+  provider          = aws.us_east_1
+  domain_name       = local.full_domain
+  validation_method = "DNS"
+  subject_alternative_names = var.environment == "prod" ? [var.domain_name] : []
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Create certificate validation records
+resource "aws_route53_record" "certificate_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.website.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
+}
+
+# Certificate validation - wait for DNS records to validate the certificate
+resource "aws_acm_certificate_validation" "website" {
+  provider = aws.us_east_1
+
+  certificate_arn         = aws_acm_certificate.website.arn
+  validation_record_fqdns = [for record in aws_route53_record.certificate_validation : record.fqdn]
+}
+
+# Create CloudFront distribution
+module "cloudfront" {
+  source = "./modules/cloudfront"
+
+  project_name          = var.project_name
+  environment           = var.environment
+  domain_name           = local.full_domain
+  domain_aliases        = local.domain_aliases
+  s3_bucket_id          = module.s3_website.bucket_id
+  s3_bucket_domain_name = module.s3_website.bucket_regional_domain_name
+  certificate_arn       = aws_acm_certificate_validation.website.certificate_arn
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
+}
+
+# Create Route53 records
+module "route53" {
+  source = "./modules/route53"
+
+  root_domain               = var.domain_name
+  zone_id                   = data.aws_route53_zone.main.zone_id
+  subdomain_name            = local.full_domain
+  cloudfront_domain_name    = module.cloudfront.distribution_domain_name
+  cloudfront_hosted_zone_id = module.cloudfront.distribution_hosted_zone_id
+
+  depends_on = [module.cloudfront]
+}
+
+resource "aws_route53_record" "root_domain" {
+  count = var.environment == "prod" ? 1 : 0
+  
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = var.domain_name
+  type    = "A"
+
+  alias {
+    name                   = module.cloudfront.distribution_domain_name
+    zone_id                = module.cloudfront.distribution_hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+# Update S3 bucket policy with correct CloudFront ARN
+resource "aws_s3_bucket_policy" "website_policy" {
+  bucket = module.s3_website.bucket_id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontServicePrincipal"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${module.s3_website.bucket_arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = module.cloudfront.distribution_arn
+          }
+        }
+      }
+    ]
+  })
+
+  depends_on = [module.cloudfront]
+}
+
+# GitHub OIDC provider (should exist in AWS account for CI/CD)
+# Will only query if github_repo is specified
+data "aws_iam_openid_connect_provider" "github" {
+  count = var.github_repo != "" ? 1 : 0
+  url   = "https://token.actions.githubusercontent.com"
+}
+
+module "iam" {
+  source = "./modules/iam"
+
+  project_name                = var.project_name
+  environment                 = var.environment
+  github_repo                 = var.github_repo
+  github_oidc_provider_arn    = var.github_repo != "" ? data.aws_iam_openid_connect_provider.github[0].arn : ""
+  s3_bucket_arn               = module.s3_website.bucket_arn
+  cloudfront_distribution_arn = module.cloudfront.distribution_arn
+  create_deployment_user      = var.create_deployment_user
+}
+===== modules/cloudfront/main.tf =====
+terraform {
+  required_providers {
+    aws = {
+      source                = "hashicorp/aws"
+      configuration_aliases = [aws.us_east_1]
+    }
+  }
+}
+
+resource "aws_cloudfront_origin_access_control" "website" {
+  name                              = "${var.project_name}-${var.environment}-oac"
+  description                       = "Origin Access Control for ${var.project_name} ${var.environment}"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_cloudfront_distribution" "website" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  default_root_object = "index.html"
+  comment             = "${var.project_name} ${var.environment} distribution"
+
+  aliases = var.certificate_arn != "" ? var.domain_aliases : []
+
+  origin {
+    domain_name              = var.s3_bucket_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.website.id
+    origin_id                = "S3-${var.s3_bucket_id}"
+  }
+
+  default_cache_behavior {
+    allowed_methods        = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = "S3-${var.s3_bucket_id}"
+    compress               = true
+    viewer_protocol_policy = "redirect-to-https"
+
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+
+    min_ttl     = 0
+    default_ttl = 3600
+    max_ttl     = 86400
+  }
+
+  # Custom error pages for SPA routing
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  price_class = "PriceClass_100"
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  dynamic "viewer_certificate" {
+    for_each = var.certificate_arn != "" ? [1] : []
+    content {
+      acm_certificate_arn      = var.certificate_arn
+      ssl_support_method       = "sni-only"
+      minimum_protocol_version = "TLSv1.2_2021"
+    }
+  }
+
+  dynamic "viewer_certificate" {
+    for_each = var.certificate_arn == "" ? [1] : []
+    content {
+      cloudfront_default_certificate = true
+    }
+  }
+}
+===== modules/cloudfront/outputs.tf =====
+output "distribution_id" {
+  description = "CloudFront distribution ID"
+  value       = aws_cloudfront_distribution.website.id
+}
+
+output "distribution_arn" {
+  description = "CloudFront distribution ARN"
+  value       = aws_cloudfront_distribution.website.arn
+}
+
+output "distribution_domain_name" {
+  description = "CloudFront distribution domain name"
+  value       = aws_cloudfront_distribution.website.domain_name
+}
+
+output "distribution_hosted_zone_id" {
+  description = "CloudFront distribution hosted zone ID"
+  value       = aws_cloudfront_distribution.website.hosted_zone_id
+}
+===== modules/cloudfront/variables.tf =====
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
+
+variable "domain_name" {
+  description = "Domain name for the CloudFront distribution"
+  type        = string
+}
+
+variable "domain_aliases" {
+  description = "List of domain aliases for the CloudFront distribution"
+  type        = list(string)
+  default     = []
+}
+
+variable "s3_bucket_id" {
+  description = "S3 bucket ID"
+  type        = string
+}
+
+variable "s3_bucket_domain_name" {
+  description = "S3 bucket domain name"
+  type        = string
+}
+
+variable "certificate_arn" {
+  description = "ARN of the ACM certificate to use for CloudFront"
+  type        = string
+  default     = ""
+}
+===== modules/iam/main.tf =====
+# IAM role for GitHub Actions OIDC
+resource "aws_iam_role" "github_actions" {
+  count = var.github_repo != "" ? 1 : 0
+
+  name = "${var.project_name}-${var.environment}-github-actions"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = var.github_oidc_provider_arn
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+          }
+          StringLike = {
+            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repo}:*"
+          }
+        }
+      }
+    ]
+  })
+}
+
+# Policy for S3 deployment access
+resource "aws_iam_policy" "s3_deployment" {
+  count = var.github_repo != "" ? 1 : 0
+
+  name        = "${var.project_name}-${var.environment}-s3-deployment"
+  description = "Policy for S3 deployment access"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          var.s3_bucket_arn,
+          "${var.s3_bucket_arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudfront:CreateInvalidation",
+          "cloudfront:GetInvalidation",
+          "cloudfront:ListInvalidations"
+        ]
+        Resource = var.cloudfront_distribution_arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_s3" {
+  count = var.github_repo != "" ? 1 : 0
+
+  role       = aws_iam_role.github_actions[0].name
+  policy_arn = aws_iam_policy.s3_deployment[0].arn
+}
+
+# Optional IAM user for deployment (alternative to OIDC)
+resource "aws_iam_user" "deployment" {
+  count = var.create_deployment_user ? 1 : 0
+
+  name = "${var.project_name}-${var.environment}-deployment"
+  path = "/"
+}
+
+resource "aws_iam_access_key" "deployment" {
+  count = var.create_deployment_user ? 1 : 0
+
+  user = aws_iam_user.deployment[0].name
+}
+
+resource "aws_iam_user_policy_attachment" "deployment_s3" {
+  count = var.create_deployment_user ? 1 : 0
+
+  user       = aws_iam_user.deployment[0].name
+  policy_arn = aws_iam_policy.s3_deployment[0].arn
+}
+===== modules/iam/outputs.tf =====
+output "github_actions_role_arn" {
+  description = "GitHub Actions IAM role ARN"
+  value       = var.github_repo != "" ? aws_iam_role.github_actions[0].arn : null
+}
+
+output "deployment_user_name" {
+  description = "Deployment IAM user name"
+  value       = var.create_deployment_user ? aws_iam_user.deployment[0].name : null
+}
+
+output "deployment_access_key_id" {
+  description = "Deployment user access key ID"
+  value       = var.create_deployment_user ? aws_iam_access_key.deployment[0].id : null
+  sensitive   = true
+}
+
+output "deployment_secret_access_key" {
+  description = "Deployment user secret access key"
+  value       = var.create_deployment_user ? aws_iam_access_key.deployment[0].secret : null
+  sensitive   = true
+}
+===== modules/iam/variables.tf =====
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
+
+variable "github_repo" {
+  description = "GitHub repository for OIDC integration"
+  type        = string
+  default     = ""
+}
+
+variable "github_oidc_provider_arn" {
+  description = "GitHub OIDC provider ARN"
+  type        = string
+  default     = ""
+}
+
+variable "s3_bucket_arn" {
+  description = "S3 bucket ARN for deployment access"
+  type        = string
+}
+
+variable "cloudfront_distribution_arn" {
+  description = "CloudFront distribution ARN for invalidation access"
+  type        = string
+}
+
+variable "create_deployment_user" {
+  description = "Whether to create IAM user for deployment"
+  type        = bool
+  default     = false
+}
+===== modules/route53/main.tf =====
+resource "aws_route53_record" "subdomain" {
+  zone_id = var.zone_id
+  name    = var.subdomain_name
+  type    = "A"
+
+  alias {
+    name                   = var.cloudfront_domain_name
+    zone_id                = var.cloudfront_hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+===== modules/route53/outputs.tf =====
+output "zone_id" {
+  description = "Route53 zone ID"
+  value       = var.zone_id
+}
+
+output "zone_name" {
+  description = "Route53 zone name"
+  value       = var.root_domain
+}
+
+output "subdomain_fqdn" {
+  description = "Fully qualified domain name of the subdomain"
+  value       = aws_route53_record.subdomain.fqdn
+}
+===== modules/route53/variables.tf =====
+variable "root_domain" {
+  description = "Root domain name (e.g., thomfilg.com)"
+  type        = string
+}
+
+variable "zone_id" {
+  description = "Route53 hosted zone ID"
+  type        = string
+}
+
+variable "subdomain_name" {
+  description = "Full subdomain name (e.g., dev.thomfilg.com)"
+  type        = string
+}
+
+variable "cloudfront_domain_name" {
+  description = "CloudFront distribution domain name"
+  type        = string
+}
+
+variable "cloudfront_hosted_zone_id" {
+  description = "CloudFront hosted zone ID (Z2FDTNDATAQYW2)"
+  type        = string
+  default     = "Z2FDTNDATAQYW2"
+}
+===== modules/s3-website/main.tf =====
+resource "aws_s3_bucket" "website" {
+  bucket = "${var.project_name}-${var.environment}-website"
+}
+
+resource "aws_s3_bucket_versioning" "website" {
+  bucket = aws_s3_bucket.website.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "website" {
+  bucket = aws_s3_bucket.website.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "website" {
+  bucket = aws_s3_bucket.website.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Upload a default index.html
+resource "aws_s3_object" "index" {
+  bucket       = aws_s3_bucket.website.bucket
+  key          = "index.html"
+  content      = var.default_index_content
+  content_type = "text/html"
+
+  # Only create if the object doesn't exist
+  lifecycle {
+    ignore_changes = [content, etag]
+  }
+}
+===== modules/s3-website/outputs.tf =====
+output "bucket_id" {
+  description = "S3 bucket ID"
+  value       = aws_s3_bucket.website.id
+}
+
+output "bucket_arn" {
+  description = "S3 bucket ARN"
+  value       = aws_s3_bucket.website.arn
+}
+
+output "bucket_domain_name" {
+  description = "S3 bucket domain name"
+  value       = aws_s3_bucket.website.bucket_domain_name
+}
+
+output "bucket_regional_domain_name" {
+  description = "S3 bucket regional domain name"
+  value       = aws_s3_bucket.website.bucket_regional_domain_name
+}
+===== modules/s3-website/variables.tf =====
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
+
+variable "cloudfront_distribution_arn" {
+  description = "CloudFront distribution ARN (optional - only used if bucket policy is managed within this module)"
+  type        = string
+  default     = ""
+}
+
+variable "default_index_content" {
+  description = "Default content for index.html"
+  type        = string
+  default     = <<-HTML
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Coming Soon</title>
+        <style>
+            body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+            h1 { color: #333; }
+        </style>
+    </head>
+    <body>
+        <h1>Coming Soon</h1>
+        <p>This site is under construction.</p>
+    </body>
+    </html>
+  HTML
+}
+===== outputs.tf =====
+output "website_url" {
+  description = "Website URL"
+  value       = "https://${local.full_domain}"
+}
+
+output "cloudfront_distribution_id" {
+  description = "CloudFront distribution ID"
+  value       = module.cloudfront.distribution_id
+}
+
+output "cloudfront_domain_name" {
+  description = "CloudFront distribution domain name"
+  value       = module.cloudfront.distribution_domain_name
+}
+
+output "s3_bucket_name" {
+  description = "S3 bucket name"
+  value       = module.s3_website.bucket_id
+}
+
+output "route53_zone_id" {
+  description = "Route53 zone ID"
+  value       = module.route53.zone_id
+}
+
+output "github_actions_role_arn" {
+  description = "GitHub Actions IAM role ARN"
+  value       = module.iam.github_actions_role_arn
+}
+
+output "deployment_access_key_id" {
+  description = "Deployment user access key ID (if created)"
+  value       = module.iam.deployment_access_key_id
+  sensitive   = true
+}
+===== variables.tf =====
+variable "environment" {
+  description = "Environment name (dev, staging, prod)"
+  type        = string
+}
+
+variable "aws_region" {
+  description = "AWS region for resources"
+  type        = string
+  default     = "us-east-1"
+}
+
+variable "domain_name" {
+  description = "Root domain name (e.g., thomfilg.com)"
+  type        = string
+}
+
+variable "subdomain" {
+  description = "Subdomain prefix (e.g., dev, staging)"
+  type        = string
+}
+
+variable "project_name" {
+  description = "Project name for resource naming"
+  type        = string
+  default     = "thomfilg-portfolio"
+}
+
+variable "github_repo" {
+  description = "GitHub repository for CI/CD integration"
+  type        = string
+  default     = "tigredonorte/thommf-portfolio"
+}
+
+variable "create_deployment_user" {
+  description = "Whether to create IAM user for deployment"
+  type        = bool
+  default     = false
+}
