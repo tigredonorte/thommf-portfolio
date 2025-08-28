@@ -15,7 +15,6 @@ module "s3_website" {
   project_name                    = var.project_name
   environment                     = var.environment
   enable_kms_encryption           = true
-  enable_versioning               = true
   enable_cross_region_replication = var.environment == "prod"
   enable_event_notifications      = true
   enable_lifecycle_rules          = true
@@ -81,8 +80,6 @@ module "cloudfront" {
   enable_geo_restriction         = true
   geo_restriction_type           = "whitelist"
   geo_restriction_locations      = ["US", "CA", "GB", "DE", "FR", "AU", "JP"]
-  enable_origin_failover         = true
-  failover_origin_domain_name    = module.s3_website.bucket_regional_domain_name
   create_response_headers_policy = true
 
   providers = {

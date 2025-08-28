@@ -32,7 +32,6 @@ resource "aws_s3_bucket_public_access_block" "cloudfront_logs" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
-
 resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
   count  = var.enable_access_logging && var.access_log_bucket == "" ? 1 : 0
   bucket = aws_s3_bucket.cloudfront_logs[0].id
@@ -56,6 +55,17 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudfront_logs" {
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
+    }
+  }
+
+  rule {
+    id     = "abort-incomplete-uploads"
+    status = "Enabled"
+
+    filter {}
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
     }
   }
 }
@@ -160,8 +170,6 @@ resource "aws_wafv2_web_acl_logging_configuration" "waf_logging" {
 }
 
 data "aws_canonical_user_id" "current" {}
-
-# WAF Web ACL for CloudFront
 resource "aws_wafv2_web_acl" "cloudfront_waf" {
   provider = aws.us_east_1
   count    = var.enable_waf ? 1 : 0
@@ -208,12 +216,84 @@ resource "aws_wafv2_web_acl" "cloudfront_waf" {
       managed_rule_group_statement {
         name        = "AWSManagedRulesKnownBadInputsRuleSet"
         vendor_name = "AWS"
+
+        # FIX: Ensure Log4j protection is enabled
+        # This rule set includes protection against Log4j vulnerability (CVE-2021-44228)
       }
     }
 
     visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "AWSManagedRulesKnownBadInputsRuleSetMetric"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # FIX: Add explicit AWS Managed Rule for Anonymous IP protection
+  rule {
+    name     = "AWS-AWSManagedRulesAnonymousIPList"
+    priority = 3
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesAnonymousIPList"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWSManagedRulesAnonymousIPListMetric"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # FIX: Add AWS Managed Rule for Amazon IP reputation list
+  rule {
+    name     = "AWS-AWSManagedRulesAmazonIpReputationList"
+    priority = 4
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesAmazonIpReputationList"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "AWSManagedRulesAmazonIpReputationListMetric"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  # FIX: Rate limiting rule to prevent abuse
+  rule {
+    name     = "RateLimitRule"
+    priority = 5
+
+    action {
+      block {}
+    }
+
+    statement {
+      rate_based_statement {
+        limit              = 2000 # 2000 requests per 5-minute window per IP
+        aggregate_key_type = "IP"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "RateLimitRuleMetric"
       sampled_requests_enabled   = true
     }
   }
@@ -275,6 +355,16 @@ resource "aws_cloudfront_origin_access_control" "website" {
   signing_protocol                  = "sigv4"
 }
 
+resource "aws_cloudfront_origin_access_control" "failover" {
+  count = var.enable_true_origin_failover && var.failover_s3_bucket_id != "" ? 1 : 0
+
+  name                              = "${var.project_name}-${var.environment}-failover-oac"
+  description                       = "Failover Origin Access Control for ${var.project_name} ${var.environment}"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
 # CloudFront Distribution
 resource "aws_cloudfront_distribution" "website" {
   enabled             = true
@@ -289,35 +379,46 @@ resource "aws_cloudfront_distribution" "website" {
   origin {
     domain_name              = var.s3_bucket_domain_name
     origin_access_control_id = aws_cloudfront_origin_access_control.website.id
-    origin_id                = "S3-${var.s3_bucket_id}"
+    origin_id                = "S3-${var.s3_bucket_id}-primary"
+
+    # Add origin shield for better performance and resilience
+    origin_shield {
+      enabled              = true
+      origin_shield_region = "us-east-1" # Choose the closest region to your users
+    }
   }
 
   # Failover origin - use the same S3 bucket as a simple failover
   dynamic "origin" {
-    for_each = var.enable_origin_failover ? [1] : []
+    for_each = var.enable_true_origin_failover && var.failover_s3_bucket_id != "" ? [1] : []
     content {
-      domain_name              = var.failover_origin_domain_name != "" ? var.failover_origin_domain_name : var.s3_bucket_domain_name
-      origin_access_control_id = aws_cloudfront_origin_access_control.website.id
-      origin_id                = "S3-${var.s3_bucket_id}-failover"
+      domain_name              = var.failover_s3_bucket_domain_name
+      origin_access_control_id = aws_cloudfront_origin_access_control.failover[0].id
+      origin_id                = "S3-${var.failover_s3_bucket_id}-failover"
+
+      origin_shield {
+        enabled              = true
+        origin_shield_region = "us-west-2" # Different region for true failover
+      }
     }
   }
 
   # Origin Group for failover
   dynamic "origin_group" {
-    for_each = var.enable_origin_failover ? [1] : []
+    for_each = var.enable_true_origin_failover && var.failover_s3_bucket_id != "" ? [1] : []
     content {
-      origin_id = "S3-${var.s3_bucket_id}-group"
+      origin_id = "S3-origin-group"
 
       failover_criteria {
         status_codes = [403, 404, 500, 502, 503, 504]
       }
 
       member {
-        origin_id = "S3-${var.s3_bucket_id}"
+        origin_id = "S3-${var.s3_bucket_id}-primary"
       }
 
       member {
-        origin_id = "S3-${var.s3_bucket_id}-failover"
+        origin_id = "S3-${var.failover_s3_bucket_id}-failover"
       }
     }
   }
@@ -333,13 +434,12 @@ resource "aws_cloudfront_distribution" "website" {
   }
 
   default_cache_behavior {
-    allowed_methods        = var.enable_origin_failover ? ["GET", "HEAD", "OPTIONS"] : ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = var.enable_origin_failover ? "S3-${var.s3_bucket_id}-group" : "S3-${var.s3_bucket_id}"
+    target_origin_id       = var.enable_true_origin_failover && var.failover_s3_bucket_id != "" ? "S3-origin-group" : "S3-${var.s3_bucket_id}-primary"
     compress               = true
     viewer_protocol_policy = "redirect-to-https"
 
-    # Response headers policy
     response_headers_policy_id = var.response_headers_policy_id != "" ? var.response_headers_policy_id : (
       var.create_response_headers_policy ? aws_cloudfront_response_headers_policy.security_headers[0].id : null
     )

@@ -129,8 +129,25 @@ resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
       storage_class = "STANDARD_IA"
     }
 
+    transition {
+      days          = 60
+      storage_class = "GLACIER"
+    }
+
+    # FIX: Added abort_incomplete_multipart_upload
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
+    }
+  }
+
+  rule {
+    id     = "abort-all-incomplete-uploads"
+    status = "Enabled"
+
+    filter {}
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
     }
   }
 }
@@ -141,8 +158,10 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "access_logs" {
 
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = "alias/aws/s3" # Use AWS managed key for logs
     }
+    bucket_key_enabled = true
   }
 }
 
@@ -232,6 +251,67 @@ resource "aws_s3_bucket_notification" "website" {
   }
 
   depends_on = [aws_sns_topic_policy.s3_notifications]
+}
+
+resource "aws_s3_bucket_notification" "access_logs" {
+  count  = var.enable_access_logging && var.enable_event_notifications ? 1 : 0
+  bucket = aws_s3_bucket.access_logs[0].id
+
+  topic {
+    topic_arn     = aws_sns_topic.s3_notifications[0].arn
+    events        = ["s3:ObjectCreated:*"]
+    filter_suffix = ".log"
+  }
+
+  depends_on = [aws_sns_topic_policy.s3_notifications]
+}
+
+resource "aws_s3_bucket_versioning" "access_logs" {
+  count  = var.enable_access_logging ? 1 : 0
+  bucket = aws_s3_bucket.access_logs[0].id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_replication_configuration" "access_logs_replication" {
+  count      = var.enable_access_logging && var.enable_cross_region_replication ? 1 : 0
+  role       = aws_iam_role.replication[0].arn
+  bucket     = aws_s3_bucket.access_logs[0].id
+  depends_on = [aws_s3_bucket_versioning.access_logs]
+
+  rule {
+    id     = "replicate-logs"
+    status = "Enabled"
+
+    filter {
+      prefix = "s3-access-logs/"
+    }
+
+    destination {
+      bucket        = "arn:aws:s3:::${var.project_name}-${var.environment}-s3-logs-replica"
+      storage_class = "GLACIER"
+
+      replication_time {
+        status = "Enabled"
+        time {
+          minutes = 15
+        }
+      }
+
+      metrics {
+        status = "Enabled"
+        event_threshold {
+          minutes = 15
+        }
+      }
+    }
+
+    delete_marker_replication {
+      status = "Enabled"
+    }
+  }
 }
 
 # S3 bucket public access block

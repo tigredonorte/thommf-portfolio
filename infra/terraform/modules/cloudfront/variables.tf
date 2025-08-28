@@ -70,22 +70,28 @@ variable "geo_restriction_type" {
   }
 }
 
+variable "enable_true_origin_failover" {
+  description = "Enable true origin failover with separate failover bucket"
+  type        = bool
+  default     = false
+}
+
+variable "failover_s3_bucket_id" {
+  description = "Failover S3 bucket ID"
+  type        = string
+  default     = ""
+}
+
+variable "failover_s3_bucket_domain_name" {
+  description = "Failover S3 bucket domain name"
+  type        = string
+  default     = ""
+}
+
 variable "geo_restriction_locations" {
   description = "List of country codes for geo restriction"
   type        = list(string)
   default     = ["US", "CA", "GB", "DE", "FR"] # Default to major markets
-}
-
-variable "enable_origin_failover" {
-  description = "Enable origin failover configuration"
-  type        = bool
-  default     = true
-}
-
-variable "failover_origin_domain_name" {
-  description = "Domain name of the failover origin"
-  type        = string
-  default     = ""
 }
 
 variable "response_headers_policy_id" {

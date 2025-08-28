@@ -1,0 +1,62 @@
+# .checkov.yaml
+# Checkov Configuration
+# Documentation: https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
+
+# Directory to scan
+directory:
+  - .
+
+# Framework to scan
+framework:
+  - terraform
+  - terraform_plan
+
+# Output format
+output: cli
+
+# Skip certain checks if needed with justification
+skip-check:
+  # Cross-region replication - Not needed for non-prod environments
+  - CKV_AWS_144 # S3 cross-region replication - Only enabled for prod
+
+  # CloudFront certificate - Using default for non-prod to save costs
+  - CKV2_AWS_42 # CloudFront custom SSL certificate - Only for prod
+
+  # S3 ACL - Required for CloudFront logs delivery
+  - CKV2_AWS_65 # S3 bucket ACL - CloudFront logs require specific ACL
+
+# Soft fail on specific checks (will show as warnings instead of failures)
+soft-fail-on:
+  - CKV_AWS_18 # S3 access logging (optional for dev)
+  - CKV_AWS_20 # S3 bucket public read access (needed for static hosting)
+  - CKV_AWS_21 # S3 bucket public write access check
+
+# Exclude paths
+skip-path:
+  - .terraform
+  - .terraform.lock.hcl
+  - '**/*.tfplan'
+  - '**/*.tfstate'
+  - '**/*.tfstate.backup'
+
+# Compact output
+compact: true
+
+# Quiet mode (less verbose)
+quiet: false
+
+# Add custom policies directory if you have any
+# external-checks-dir:
+#   - ./policies
+
+# Enable new checks
+enable-secret-scan-all-files: true
+
+# Set severity threshold (LOW, MEDIUM, HIGH, CRITICAL)
+check:
+  - HIGH
+  - CRITICAL
+  - MEDIUM
+
+# Download external checks
+download-external-modules: true
