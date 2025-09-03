@@ -12,8 +12,9 @@ terraform {
 
 # S3 bucket for CloudFront access logs
 resource "aws_s3_bucket" "cloudfront_logs" {
-  count  = var.enable_access_logging && var.access_log_bucket == "" ? 1 : 0
-  bucket = "${var.project_name}-${var.environment}-cf-logs"
+  count         = var.enable_access_logging && var.access_log_bucket == "" ? 1 : 0
+  bucket        = "${var.project_name}-${var.environment}-cf-logs"
+  force_destroy = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-cf-logs"
@@ -347,22 +348,23 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
   }
 }
 
-resource "aws_cloudfront_origin_access_control" "website" {
-  name                              = "${var.project_name}-${var.environment}-oac"
-  description                       = "Origin Access Control for ${var.project_name} ${var.environment}"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
+# CloudFront Function for SPA routing
+resource "aws_cloudfront_function" "spa_router" {
+  name    = "${var.project_name}-${var.environment}-spa-router"
+  runtime = "cloudfront-js-1.0"
+  comment = "Routes SPA paths to index.html while preserving static asset paths"
+  publish = true
+  code    = file("${path.module}/viewer-request.js")
 }
 
-resource "aws_cloudfront_origin_access_control" "failover" {
-  count = var.enable_true_origin_failover && var.failover_s3_bucket_id != "" ? 1 : 0
+# Origin Access Identity for CloudFront
+resource "aws_cloudfront_origin_access_identity" "website" {
+  comment = "OAI for ${var.project_name} ${var.environment}"
+}
 
-  name                              = "${var.project_name}-${var.environment}-failover-oac"
-  description                       = "Failover Origin Access Control for ${var.project_name} ${var.environment}"
-  origin_access_control_origin_type = "s3"
-  signing_behavior                  = "always"
-  signing_protocol                  = "sigv4"
+resource "aws_cloudfront_origin_access_identity" "failover" {
+  count   = var.enable_true_origin_failover && var.failover_s3_bucket_id != "" ? 1 : 0
+  comment = "Failover OAI for ${var.project_name} ${var.environment}"
 }
 
 # CloudFront Distribution
@@ -375,26 +377,48 @@ resource "aws_cloudfront_distribution" "website" {
 
   aliases = var.certificate_arn != "" ? var.domain_aliases : []
 
-  # Primary origin
+  # Primary origin - Use S3 website endpoint as custom origin
   origin {
-    domain_name              = var.s3_bucket_domain_name
-    origin_access_control_id = aws_cloudfront_origin_access_control.website.id
-    origin_id                = "S3-${var.s3_bucket_id}-primary"
+    domain_name = var.s3_website_endpoint != "" ? var.s3_website_endpoint : var.s3_bucket_domain_name
+    origin_id   = "S3-${var.s3_bucket_id}-primary"
 
-    # Add origin shield for better performance and resilience
+
+    # Use custom origin config for S3 static website hosting
+    dynamic "custom_origin_config" {
+      for_each = var.s3_website_endpoint != "" ? [1] : []
+      content {
+        http_port              = 80
+        https_port             = 443
+        origin_protocol_policy = "http-only"
+        origin_ssl_protocols   = ["TLSv1.2"]
+      }
+    }
+
+    # Use s3_origin_config with OAI as fallback
+    dynamic "s3_origin_config" {
+      for_each = var.s3_website_endpoint == "" ? [1] : []
+      content {
+        origin_access_identity = aws_cloudfront_origin_access_identity.website.cloudfront_access_identity_path
+      }
+    }
+
+    # Add origin shield for better performance and resilience  
     origin_shield {
       enabled              = true
       origin_shield_region = "us-east-1" # Choose the closest region to your users
     }
   }
 
-  # Failover origin - use the same S3 bucket as a simple failover
+  # Failover origin with OAI
   dynamic "origin" {
     for_each = var.enable_true_origin_failover && var.failover_s3_bucket_id != "" ? [1] : []
     content {
-      domain_name              = var.failover_s3_bucket_domain_name
-      origin_access_control_id = aws_cloudfront_origin_access_control.failover[0].id
-      origin_id                = "S3-${var.failover_s3_bucket_id}-failover"
+      domain_name = var.failover_s3_bucket_domain_name
+      origin_id   = "S3-${var.failover_s3_bucket_id}-failover"
+
+      s3_origin_config {
+        origin_access_identity = aws_cloudfront_origin_access_identity.failover[0].cloudfront_access_identity_path
+      }
 
       origin_shield {
         enabled              = true
@@ -444,6 +468,12 @@ resource "aws_cloudfront_distribution" "website" {
       var.create_response_headers_policy ? aws_cloudfront_response_headers_policy.security_headers[0].id : null
     )
 
+    # Add CloudFront Function for SPA routing
+    # function_association {
+    #   event_type   = "viewer-request"
+    #   function_arn = aws_cloudfront_function.spa_router.arn
+    # }
+
     forwarded_values {
       query_string = false
       cookies {
@@ -456,15 +486,9 @@ resource "aws_cloudfront_distribution" "website" {
     max_ttl     = 86400
   }
 
-  # Custom error pages for SPA routing
+  # Custom error pages for SPA routing (only for 404, not 403)
   custom_error_response {
     error_code         = 404
-    response_code      = 200
-    response_page_path = "/index.html"
-  }
-
-  custom_error_response {
-    error_code         = 403
     response_code      = 200
     response_page_path = "/index.html"
   }

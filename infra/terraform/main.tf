@@ -14,8 +14,8 @@ module "s3_website" {
 
   project_name                    = var.project_name
   environment                     = var.environment
-  enable_kms_encryption           = true
-  enable_cross_region_replication = var.environment == "prod"
+  enable_kms_encryption           = false
+  enable_cross_region_replication = false # Temporarily disabled - replica buckets don't exist
   enable_event_notifications      = true
   enable_lifecycle_rules          = true
   enable_access_logging           = true
@@ -73,13 +73,14 @@ module "cloudfront" {
   environment                    = var.environment
   domain_aliases                 = local.domain_aliases
   s3_bucket_id                   = module.s3_website.bucket_id
-  s3_bucket_domain_name          = module.s3_website.bucket_regional_domain_name
+  s3_bucket_domain_name          = module.s3_website.bucket_domain_name
+  s3_website_endpoint            = module.s3_website.website_endpoint
   certificate_arn                = aws_acm_certificate_validation.website.certificate_arn
   enable_access_logging          = true
-  enable_waf                     = var.environment == "prod"
-  enable_geo_restriction         = true
-  geo_restriction_type           = "whitelist"
-  geo_restriction_locations      = ["US", "CA", "GB", "DE", "FR", "AU", "JP"]
+  enable_waf                     = false # Temporarily disabled due to WAF creation issue
+  enable_geo_restriction         = false # Disabled to allow global access
+  geo_restriction_type           = "none"
+  geo_restriction_locations      = []
   create_response_headers_policy = true
 
   providers = {
@@ -114,7 +115,7 @@ resource "aws_route53_record" "root_domain" {
   }
 }
 
-# Update S3 bucket policy with correct CloudFront ARN
+# Update S3 bucket policy for public read access (static website hosting)
 resource "aws_s3_bucket_policy" "website_policy" {
   bucket = module.s3_website.bucket_id
 
@@ -122,23 +123,16 @@ resource "aws_s3_bucket_policy" "website_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowCloudFrontServicePrincipal"
-        Effect = "Allow"
-        Principal = {
-          Service = "cloudfront.amazonaws.com"
-        }
-        Action   = "s3:GetObject"
-        Resource = "${module.s3_website.bucket_arn}/*"
-        Condition = {
-          StringEquals = {
-            "AWS:SourceArn" = module.cloudfront.distribution_arn
-          }
-        }
+        Sid       = "PublicReadGetObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:GetObject"
+        Resource  = "${module.s3_website.bucket_arn}/*"
       }
     ]
   })
 
-  depends_on = [module.cloudfront]
+  depends_on = [module.s3_website]
 }
 
 # GitHub OIDC provider (should exist in AWS account for CI/CD)

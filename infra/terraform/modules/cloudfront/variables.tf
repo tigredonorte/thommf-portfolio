@@ -24,6 +24,12 @@ variable "s3_bucket_domain_name" {
   type        = string
 }
 
+variable "s3_website_endpoint" {
+  description = "S3 static website endpoint (when using S3 static hosting)"
+  type        = string
+  default     = ""
+}
+
 variable "certificate_arn" {
   description = "ARN of the ACM certificate to use for CloudFront"
   type        = string

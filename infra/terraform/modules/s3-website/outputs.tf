@@ -37,3 +37,13 @@ output "replication_role_arn" {
   description = "ARN of the replication IAM role"
   value       = var.enable_cross_region_replication ? aws_iam_role.replication[0].arn : null
 }
+
+output "website_endpoint" {
+  description = "S3 static website endpoint"
+  value       = aws_s3_bucket_website_configuration.website.website_endpoint
+}
+
+output "website_domain" {
+  description = "S3 static website domain"
+  value       = aws_s3_bucket_website_configuration.website.website_domain
+}

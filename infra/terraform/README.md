@@ -23,7 +23,7 @@ thomfilg.com (manually managed)
 ## Prerequisites
 
 1. **Domain Setup**: `thomfilg.com` must be registered and have a Route53 hosted zone
-2. **S3 Backend**: `requisition-terraform-state` bucket must exist
+2. **S3 Backend**: `thomfilg-terraform-state` bucket must exist
 3. **DynamoDB Table**: `terraform-locks` table for state locking (optional but recommended)
 4. **GitHub OIDC**: AWS IAM OIDC provider for GitHub Actions (for CI/CD)
 
@@ -73,7 +73,7 @@ Each environment has its own `terraform.tfvars` file containing environment-spec
 Each environment has a separate backend configuration file for state management:
 
 ```hcl
-bucket = "requisition-terraform-state"
+bucket = "thomfilg-terraform-state"
 key    = "environments/{environment}/terraform.tfstate"
 region = "us-east-1"
 encrypt = true
@@ -131,6 +131,7 @@ terraform apply -var-file=environments/dev/terraform.tfvars
 The GitHub Actions workflows automatically use the appropriate configuration files based on the environment:
 
 1. **deploy-infra.yml**: Handles infrastructure deployment
+
    - Uses `backend.tfvars` for state configuration
    - Uses `terraform.tfvars` for environment variables
 
@@ -140,6 +141,7 @@ The GitHub Actions workflows automatically use the appropriate configuration fil
 ### Setting up GitHub OIDC
 
 1. Create GitHub OIDC provider in AWS (once per account):
+
    ```bash
    aws iam create-open-id-connect-provider \
      --url https://token.actions.githubusercontent.com \
@@ -154,21 +156,25 @@ The GitHub Actions workflows automatically use the appropriate configuration fil
 ## Module Details
 
 ### S3 Website Module
+
 - Creates encrypted S3 bucket with versioning
 - Configures bucket policy for CloudFront access
 - Uploads default index.html
 
 ### CloudFront Module
+
 - Creates Origin Access Control (OAC) for S3 access
 - Generates ACM certificate for HTTPS
 - Configures caching and error pages for SPA routing
 
 ### Route53 Module
+
 - Creates subdomain A records pointing to CloudFront
 - Manages certificate validation DNS records
 - Looks up existing Route53 hosted zone
 
 ### IAM Module
+
 - Creates GitHub Actions role with OIDC trust policy
 - Provides minimal S3 and CloudFront permissions
 - Optional IAM user creation for alternative access
@@ -220,6 +226,7 @@ To migrate from `infra/terraform`:
 ## Cost Estimation
 
 Per environment (monthly):
+
 - S3 storage: ~$0.50 (assuming 1GB)
 - CloudFront: ~$1.00 (first 1TB free tier)
 - Route53 queries: ~$0.50

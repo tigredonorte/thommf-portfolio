@@ -87,8 +87,9 @@ resource "aws_sns_topic_policy" "s3_notifications" {
 
 # S3 bucket for access logs (CKV_AWS_18)
 resource "aws_s3_bucket" "access_logs" {
-  count  = var.enable_access_logging ? 1 : 0
-  bucket = "${var.project_name}-${var.environment}-s3-logs"
+  count         = var.enable_access_logging ? 1 : 0
+  bucket        = "${var.project_name}-${var.environment}-s3-logs"
+  force_destroy = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-s3-logs"
@@ -167,7 +168,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "access_logs" {
 
 # Main S3 bucket for website
 resource "aws_s3_bucket" "website" {
-  bucket = "${var.project_name}-${var.environment}-website"
+  bucket        = "${var.project_name}-${var.environment}-website"
+  force_destroy = true
 
   tags = {
     Name        = "${var.project_name}-${var.environment}-website"
@@ -314,14 +316,27 @@ resource "aws_s3_bucket_replication_configuration" "access_logs_replication" {
   }
 }
 
-# S3 bucket public access block
+# Enable static website hosting
+resource "aws_s3_bucket_website_configuration" "website" {
+  bucket = aws_s3_bucket.website.id
+
+  index_document {
+    suffix = "index.html"
+  }
+
+  error_document {
+    key = "index.html"
+  }
+}
+
+# S3 bucket public access block - Allow public read for static website
 resource "aws_s3_bucket_public_access_block" "website" {
   bucket = aws_s3_bucket.website.id
 
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
 }
 
 # Upload a default index.html

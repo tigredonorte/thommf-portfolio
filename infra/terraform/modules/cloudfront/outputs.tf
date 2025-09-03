@@ -32,3 +32,8 @@ output "access_logs_bucket" {
   description = "S3 bucket for CloudFront access logs"
   value       = var.enable_access_logging && var.access_log_bucket == "" ? aws_s3_bucket.cloudfront_logs[0].id : var.access_log_bucket
 }
+
+output "origin_access_identity_iam_arn" {
+  description = "IAM ARN of the CloudFront Origin Access Identity"
+  value       = aws_cloudfront_origin_access_identity.website.iam_arn
+}
