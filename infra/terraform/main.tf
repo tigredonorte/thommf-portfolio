@@ -73,7 +73,7 @@ module "cloudfront" {
   environment                    = var.environment
   domain_aliases                 = local.domain_aliases
   s3_bucket_id                   = module.s3_website.bucket_id
-  s3_bucket_domain_name          = module.s3_website.bucket_regional_domain_name
+  s3_bucket_domain_name          = module.s3_website.bucket_domain_name
   certificate_arn                = aws_acm_certificate_validation.website.certificate_arn
   enable_access_logging          = true
   enable_waf                     = var.environment == "prod"
