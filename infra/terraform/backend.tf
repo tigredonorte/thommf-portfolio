@@ -1,13 +1,7 @@
 terraform {
   backend "s3" {
-    bucket  = "requisition-terraform-state"
-    region  = "us-east-1"
-    encrypt = true
-    # dynamodb_table = "terraform-locks"  # Uncomment when table is created
-
-    # Key will be set via -backend-config or environment variables
-    # Format: environments/{environment}/terraform.tfstate
-    # For local dev: environments/{environment}-{username}/terraform.tfstate
+    # Backend configuration is provided via backend.tfvars files
+    # See environments/{environment}/backend.tfvars for configuration
   }
 
   required_version = ">= 1.0"
